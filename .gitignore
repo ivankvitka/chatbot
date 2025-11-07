@@ -1,0 +1,146 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+lerna-debug.log*
+
+# Dependencies
+node_modules
+**/node_modules
+
+# Compiled output
+dist
+dist-ssr
+**/dist
+**/build
+
+# TypeScript
+*.tsbuildinfo
+**/*.tsbuildinfo
+
+# OS
+.DS_Store
+*.local
+Thumbs.db
+Desktop.ini
+
+# Tests
+coverage
+**/coverage
+.nyc_output
+**/.nyc_output
+*.lcov
+test-results/
+playwright-report/
+
+# IDEs and editors
+.idea
+**/.idea
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+*.sublime-workspace
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# IDE - VSCode
+.vscode/*
+**/.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+**/.vscode/extensions.json
+
+# dotenv environment variable files
+.env
+.env.development.local
+.env.test.local
+.env.production.local
+.env.local
+**/.env
+**/.env.*
+
+# temp directory
+.temp
+.tmp
+**/.temp
+**/.tmp
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
+
+# Cache directories
+.cache
+**/.cache
+.npm
+.eslintcache
+.stylelintcache
+*.cache
+.vite
+**/.vite
+
+# Build tools
+.turbo
+.next
+.nuxt
+.output
+.vercel
+
+# Backend specific
+backend/generated/prisma
+backend/dist
+backend/coverage
+
+# Frontend specific
+frontend/dist
+frontend/dist-ssr
+frontend/.vite
+frontend/coverage
+
+# Screenshots (generated files)
+backend/screenshots/
+backend/screenshot.png
+**/screenshots/
+**/*screenshot*.png
+
+# WhatsApp Web JS session data
+backend/.wwebjs_auth
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Prisma
+**/prisma/migrations/.migrate/
+**/.prisma/
+
+# Puppeteer
+.local-chromium/
+puppeteer_cache/
+
+# Lock files (optional - uncomment if you don't want to commit them)
+# package-lock.json
+# yarn.lock
+# pnpm-lock.yaml
+
