@@ -120,6 +120,8 @@ backend/screenshot.png
 
 # WhatsApp Web JS session data
 backend/.wwebjs_auth
+backend/.wwebjs_cache/
+**/whatsapp-session/
 
 # Docker
 docker-compose.override.yml
@@ -144,3 +146,4 @@ puppeteer_cache/
 # yarn.lock
 # pnpm-lock.yaml
 
+**/whatsapp-session.json/

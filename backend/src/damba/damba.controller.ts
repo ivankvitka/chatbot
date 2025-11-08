@@ -1,17 +1,33 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { DambaService } from './damba.service';
+import { SaveDambaTokenDto } from './dto/save-damba-token.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { User } from '../../generated/prisma';
 
 @Controller('damba')
 export class DambaController {
   constructor(private readonly dambaService: DambaService) {}
 
-  @Get('screenshot/take')
-  async getScreenshot() {
-    return this.dambaService.takeScreenshot();
+  @Get('screenshot')
+  getScreenshotLink() {
+    return this.dambaService.getScreenshotLink();
   }
 
-  @Get('screenshot/download')
-  async downloadScreenshot(@Query('filepath') filepath: string) {
-    return this.dambaService.getScreenshotBuffer(filepath);
+  @UseGuards(JwtAuthGuard)
+  @Post('token')
+  async saveToken(
+    @Request() req: Request & { user: User },
+    @Body() saveDambaTokenDto: SaveDambaTokenDto,
+  ) {
+    const userId = req.user.id;
+    await this.dambaService.saveToken(userId, saveDambaTokenDto.token);
+    return { success: true, message: 'Damba token saved successfully' };
   }
 }

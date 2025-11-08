@@ -4,10 +4,17 @@ import * as puppeteer from 'puppeteer';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class DambaService {
-  constructor(private readonly prisma: PrismaService) {}
+  private readonly API_URL: string | undefined;
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly configService: ConfigService,
+  ) {
+    this.API_URL = this.configService.getOrThrow<string>('API_URL');
+  }
   private readonly logger = new Logger(DambaService.name);
   private browser: puppeteer.Browser | null = null;
   private page: puppeteer.Page | null = null;
@@ -101,16 +108,8 @@ export class DambaService {
     }
   }
 
-  async getScreenshotBuffer(filepath: string): Promise<Buffer> {
-    await this.takeScreenshot();
-    try {
-      return await fs.readFile(filepath);
-    } catch (error) {
-      this.logger.error(
-        `Error reading screenshot file: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      throw error;
-    }
+  getScreenshotLink(): string {
+    return `${this.API_URL}/screenshots/screenshot-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
   }
 
   async deleteOldScreenshots(): Promise<void> {
@@ -133,6 +132,21 @@ export class DambaService {
     } catch (error) {
       this.logger.error(
         `Error deleting screenshots: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  async saveToken(userId: number, token: string): Promise<void> {
+    try {
+      await this.prisma.user.update({
+        where: { id: userId },
+        data: { dambaToken: token },
+      });
+      this.logger.log(`Damba token saved for user ${userId}`);
+    } catch (error) {
+      this.logger.error(
+        `Error saving Damba token: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
     }

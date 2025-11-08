@@ -1,4 +1,4 @@
-import { apiService } from "./api";
+import { authApi } from "./auth.api";
 
 export interface User {
   id: number;
@@ -30,7 +30,7 @@ class AuthService {
     email: string,
     password: string
   ): Promise<{ user: User; token: string }> {
-    const response = await apiService.login(email, password);
+    const response = await authApi.login(email, password);
     const { user, access_token } = response;
 
     this.user = user;
@@ -45,7 +45,7 @@ class AuthService {
     email: string,
     password: string
   ): Promise<{ user: User; token: string }> {
-    const response = await apiService.register(name, email, password);
+    const response = await authApi.register(name, email, password);
     const { user, access_token } = response;
 
     this.user = user;
@@ -70,7 +70,7 @@ class AuthService {
   }
 
   async getProfile(): Promise<User> {
-    const response = await apiService.getProfile();
+    const response = await authApi.getProfile();
     return response;
   }
 
@@ -80,7 +80,7 @@ class AuthService {
         return null;
       }
 
-      const user = await apiService.getProfile();
+      const user = await authApi.getProfile();
       this.user = user;
       localStorage.setItem("user", JSON.stringify(user));
       return user;

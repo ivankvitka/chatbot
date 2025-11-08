@@ -1,9 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import type { Express } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+
+  // Trust proxy for correct IP address detection
+  const httpAdapter = app.getHttpAdapter();
+  (httpAdapter.getInstance() as Express).set('trust proxy', true);
 
   // Enable CORS for frontend
   app.enableCors({

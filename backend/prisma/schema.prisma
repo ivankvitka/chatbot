@@ -19,13 +19,14 @@ model User {
   email      String  @unique
   name       String
   password   String
-  dambaToken String?
+  dambaToken String? @map("damba_token")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
-  dambaSettingsId Int?           @unique
+  dambaSettingsId Int?           @unique @map("damba_settings_id")
   dambaSettings   DambaSettings? @relation(fields: [dambaSettingsId], references: [id])
+  sessions        Session[]
 
   @@map("users")
 }
@@ -33,9 +34,26 @@ model User {
 model DambaSettings {
   id        Int      @id @default(autoincrement())
   settings  Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
   user      User?
 
   @@map("damba_settings")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  refreshToken String   @unique
+  userId       Int      @map("user_id")
+  userAgent    String?  @map("user_agent")
+  ipAddress    String?  @map("ip_address")
+  expiresAt    DateTime @map("expires_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([refreshToken])
+  @@index([expiresAt])
+  @@map("sessions")
 }
