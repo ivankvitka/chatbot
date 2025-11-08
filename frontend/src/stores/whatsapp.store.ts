@@ -9,6 +9,10 @@ interface WhatsAppStatus {
 interface WhatsAppGroup {
   id: string;
   name: string;
+  settings?: {
+    enabled: boolean;
+    intervalMinutes: number;
+  } | null;
 }
 
 interface WhatsAppState {

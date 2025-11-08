@@ -63,6 +63,17 @@ export const WhatsAppGroupsList: React.FC = () => {
                     <p className="text-sm font-medium text-gray-900">
                       {group.name}
                     </p>
+                    {group.settings?.enabled && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Автоматична відправка: кожні{" "}
+                        {group.settings.intervalMinutes}{" "}
+                        {group.settings.intervalMinutes === 1
+                          ? "хвилину"
+                          : group.settings.intervalMinutes < 5
+                          ? "хвилини"
+                          : "хвилин"}
+                      </p>
+                    )}
                   </div>
                   <button
                     onClick={() => {
@@ -115,6 +126,7 @@ export const WhatsAppGroupsList: React.FC = () => {
           }}
           groupId={selectedGroup.id}
           groupName={selectedGroup.name}
+          onSave={getGroups}
         />
       )}
     </div>

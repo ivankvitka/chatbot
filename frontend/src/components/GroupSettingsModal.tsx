@@ -6,6 +6,7 @@ interface GroupSettingsModalProps {
   onClose: () => void;
   groupId: string;
   groupName: string;
+  onSave?: () => void;
 }
 
 const INTERVAL_OPTIONS = [1, 5, 10, 15, 30, 60];
@@ -15,6 +16,7 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
   onClose,
   groupId,
   groupName,
+  onSave,
 }) => {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -63,6 +65,7 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
         intervalMinutes,
         enabled
       );
+      onSave?.();
       onClose();
     } catch (err) {
       const errorMessage =
@@ -89,6 +92,7 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
       setSaving(true);
       setError(null);
       await whatsappApi.deleteGroupSettings(groupId);
+      onSave?.();
       onClose();
     } catch (err) {
       const errorMessage =

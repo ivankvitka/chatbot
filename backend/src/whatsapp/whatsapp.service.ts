@@ -7,6 +7,7 @@ import {
 import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class WhatsappService implements OnModuleInit, OnModuleDestroy {
@@ -14,6 +15,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   private client: Client | null = null;
   private qrCode: string | null = null;
   private isReady: boolean = false;
+
+  constructor(private readonly prisma: PrismaService) {}
 
   onModuleInit() {
     this.initializeClient();
@@ -130,7 +133,16 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     return this.client;
   }
 
-  async getGroups(): Promise<Array<{ id: string; name: string }>> {
+  async getGroups(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      settings?: {
+        enabled: boolean;
+        intervalMinutes: number;
+      } | null;
+    }>
+  > {
     if (!this.client || !this.isReady) {
       throw new Error('WhatsApp client is not ready');
     }
@@ -139,10 +151,45 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       const chats = await this.client.getChats();
       const groups = chats.filter((chat) => chat.isGroup);
 
-      return groups.map((group) => ({
-        id: group.id._serialized,
-        name: group.name,
-      }));
+      // Get all group settings from database
+      const groupIds = groups.map((group) => group.id._serialized);
+      const settingsMap = new Map<
+        string,
+        { enabled: boolean; intervalMinutes: number }
+      >();
+
+      if (groupIds.length > 0) {
+        const settings = await this.prisma.groupScreenshotSettings.findMany({
+          where: {
+            groupId: {
+              in: groupIds,
+            },
+          },
+          select: {
+            groupId: true,
+            enabled: true,
+            intervalMinutes: true,
+          },
+        });
+
+        settings.forEach((setting) => {
+          settingsMap.set(setting.groupId, {
+            enabled: setting.enabled,
+            intervalMinutes: setting.intervalMinutes,
+          });
+        });
+      }
+
+      return groups.map((group) => {
+        const groupId = group.id._serialized;
+        const settings = settingsMap.get(groupId);
+
+        return {
+          id: groupId,
+          name: group.name,
+          settings: settings || null,
+        };
+      });
     } catch (error) {
       this.logger.error('Failed to get groups:', error);
       throw new Error('Failed to retrieve groups');
