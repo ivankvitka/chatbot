@@ -1,42 +1,19 @@
 
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './components/auth/Login';
 import { Register } from './components/auth/Register';
 import { Dashboard } from './pages/Dashboard';
-import { authService } from './services/auth';
+import { useAuthStore } from './stores/auth.store';
 import './App.css';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [loading, setLoading] = useState(true);
+  const { isAuthenticated, loading, checkAuth } = useAuthStore();
 
   useEffect(() => {
-    checkAuthStatus();
+    checkAuth();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const checkAuthStatus = async () => {
-    try {
-      const token = localStorage.getItem('token');
-      if (token) {
-        // Verify token is still valid
-        await authService.getProfile();
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      localStorage.removeItem('token');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLoginSuccess = () => {
-    setIsAuthenticated(true);
-  };
-
-  const handleRegisterSuccess = () => {
-    setIsAuthenticated(true);
-  };
 
   if (loading) {
     return (
@@ -60,7 +37,7 @@ function App() {
             isAuthenticated ? (
               <Navigate to="/dashboard" replace />
             ) : (
-              <Login onLoginSuccess={handleLoginSuccess} />
+              <Login />
             )
           }
         />
@@ -70,7 +47,7 @@ function App() {
             isAuthenticated ? (
               <Navigate to="/dashboard" replace />
             ) : (
-              <Register onRegisterSuccess={handleRegisterSuccess} />
+              <Register />
             )
           }
         />

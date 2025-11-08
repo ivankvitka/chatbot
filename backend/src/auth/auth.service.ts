@@ -25,8 +25,11 @@ export class AuthService {
       user.password &&
       (await bcrypt.compare(password, user.password))
     ) {
-      const { password, ...result } = user;
-      return result as User;
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      } as User;
     }
     return null;
   }
@@ -79,8 +82,6 @@ export class AuthService {
       },
     });
 
-    const { password, ...result } = user;
-
     const payload = { email: user.email, sub: user.id };
     const access_token = this.jwtService.sign(payload);
     const refresh_token = await this.generateRefreshToken(
@@ -92,7 +93,11 @@ export class AuthService {
     return {
       access_token,
       refresh_token,
-      user: result as User,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+      } as User,
     };
   }
 
@@ -105,8 +110,11 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const { password, ...result } = foundUser;
-    return result as User;
+    return {
+      id: foundUser.id,
+      email: foundUser.email,
+      name: foundUser.name,
+    } as User;
   }
 
   /**

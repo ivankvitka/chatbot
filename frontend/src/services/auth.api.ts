@@ -21,6 +21,20 @@ class AuthApi {
     const response = await this.api.get("/auth/profile");
     return response.data;
   }
+
+  async refresh(refreshToken: string) {
+    const response = await this.api.post("/auth/refresh", {
+      refresh_token: refreshToken,
+    });
+    return response.data;
+  }
+
+  async logout(refreshToken: string) {
+    const response = await this.api.post("/auth/logout", {
+      refresh_token: refreshToken,
+    });
+    return response.data;
+  }
 }
 
 export const authApi = new AuthApi();

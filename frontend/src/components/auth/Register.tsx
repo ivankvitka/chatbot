@@ -1,37 +1,29 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { authService } from '../../services/auth';
+import { Link, useNavigate } from 'react-router-dom';
+import { useAuthStore } from '../../stores/auth.store';
 
-interface RegisterProps {
-  onRegisterSuccess?: () => void;
-}
-
-export const Register: React.FC<RegisterProps> = ({ onRegisterSuccess }) => {
+export const Register: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { register, loading, error, setError } = useAuthStore();
+  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(null);
 
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
     }
 
-    setLoading(true);
-
     try {
-      await authService.register(name, email, password);
-      onRegisterSuccess?.();
+      await register(name, email, password);
+      navigate('/dashboard');
     } catch (error: any) {
-      setError(error.response?.data?.message || 'Registration failed');
-    } finally {
-      setLoading(false);
+      // Error is already set in the store
     }
   };
 

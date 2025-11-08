@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { QRCodeSVG as QRCode } from 'qrcode.react';
-import { whatsappApi } from '../services/whatsapp.api';
+import { useWhatsAppStore } from '../stores/whatsapp.store';
 
 interface WhatsAppAuthModalProps {
   isOpen: boolean;
@@ -11,47 +11,28 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [whatsappQR, setWhatsappQR] = useState<string | null>(null);
-  const [whatsappStatus, setWhatsappStatus] = useState<{ isReady: boolean } | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const { 
+    status, 
+    qrCode, 
+    loading, 
+    error, 
+    checkStatus, 
+    loadQR, 
+    setError,
+    clearQR 
+  } = useWhatsAppStore();
 
   useEffect(() => {
     if (isOpen) {
-      loadWhatsAppStatus();
-      loadWhatsAppQR();
+      checkStatus();
+      loadQR();
+    } else {
+      // Clear QR when modal closes
+      clearQR();
+      setError(null);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
-
-  const loadWhatsAppStatus = async () => {
-    try {
-      const status = await whatsappApi.getStatus();
-      setWhatsappStatus(status);
-    } catch (error) {
-      console.error('Failed to load WhatsApp status:', error);
-    }
-  };
-
-  const loadWhatsAppQR = async () => {
-    try {
-      setLoading(true);
-      setError('');
-      const response = await whatsappApi.getQR();
-      if (response.qr) {
-        setWhatsappQR(response.qr);
-      } else {
-        setError('QR код не доступний. Можливо, WhatsApp вже підключено або виникла помилка.');
-      }
-    } catch (error: unknown) {
-      const errorMessage =
-        error && typeof error === 'object' && 'response' in error
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setError(errorMessage || 'Помилка завантаження QR коду');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (!isOpen) return null;
 
@@ -76,7 +57,7 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
           </button>
         </div>
 
-        {whatsappStatus?.isReady ? (
+        {status?.isReady ? (
           <div className="text-center py-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
               <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -92,18 +73,18 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
                 <p className="mt-4 text-gray-600">Завантаження QR коду...</p>
               </div>
-            ) : whatsappQR ? (
+            ) : qrCode ? (
               <div>
                 <p className="text-sm text-gray-600 mb-4">
                   Відскануйте QR код за допомогою WhatsApp на вашому телефоні
                 </p>
                 <div className="flex justify-center mb-4">
                   <div className="bg-white p-4 rounded-lg border-2 border-gray-200">
-                    <QRCode value={whatsappQR} size={256} />
+                    <QRCode value={qrCode} size={256} />
                   </div>
                 </div>
                 <button
-                  onClick={loadWhatsAppQR}
+                  onClick={loadQR}
                   className="text-sm text-green-600 hover:text-green-700 font-medium"
                 >
                   Оновити QR код
@@ -113,7 +94,7 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
               <div className="py-8">
                 <p className="text-gray-600 mb-4">{error || 'QR код не доступний'}</p>
                 <button
-                  onClick={loadWhatsAppQR}
+                  onClick={loadQR}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   Спробувати ще раз
