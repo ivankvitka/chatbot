@@ -44,7 +44,7 @@ export class DambaService {
       });
       const settings = JSON.parse(
         window.localStorage.getItem('localUserSettings') || '{}',
-      );
+      ) as Record<string, unknown>;
       const newSettings = {
         ...settings,
         eRocketTargetsEnabled: true,
@@ -110,6 +110,49 @@ export class DambaService {
 
   getScreenshotLink(): string {
     return `${this.API_URL}/screenshots/screenshot-${new Date().toISOString().replace(/[:.]/g, '-')}.png`;
+  }
+
+  async getLastScreenshot(): Promise<{
+    filename: string;
+    url: string;
+    createdAt: string;
+  } | null> {
+    try {
+      const screenshotsDir = path.join(process.cwd(), 'screenshots');
+      try {
+        await fs.access(screenshotsDir);
+      } catch {
+        return null;
+      }
+
+      const files = await fs.readdir(screenshotsDir);
+      const screenshotFiles = files
+        .filter(
+          (file) => file.startsWith('screenshot-') && file.endsWith('.png'),
+        )
+        .sort()
+        .reverse();
+
+      if (screenshotFiles.length === 0) {
+        return null;
+      }
+
+      const lastScreenshot = screenshotFiles[0];
+      const filepath = path.join(screenshotsDir, lastScreenshot);
+      const stats = await fs.stat(filepath);
+      const url = `${this.API_URL}/screenshots/${lastScreenshot}`;
+
+      return {
+        filename: lastScreenshot,
+        url,
+        createdAt: stats.mtime.toISOString(),
+      };
+    } catch (error) {
+      this.logger.error(
+        `Error getting last screenshot: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
   }
 
   async deleteOldScreenshots(): Promise<void> {

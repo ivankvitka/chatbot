@@ -20,6 +20,15 @@ export class DambaController {
     return this.dambaService.getScreenshotLink();
   }
 
+  @Get('last-screenshot')
+  async getLastScreenshot() {
+    const screenshot = await this.dambaService.getLastScreenshot();
+    if (!screenshot) {
+      return { screenshot: null };
+    }
+    return { screenshot };
+  }
+
   @UseGuards(JwtAuthGuard)
   @Post('token')
   async saveToken(
