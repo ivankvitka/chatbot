@@ -1,17 +1,26 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body } from '@nestjs/common';
 import { DambaService } from './damba.service';
+import { SaveDambaTokenDto } from './dto/save-damba-token.dto';
 
 @Controller('damba')
 export class DambaController {
   constructor(private readonly dambaService: DambaService) {}
 
-  @Get('screenshot/take')
+  @Get('screenshot')
   async getScreenshot() {
-    return this.dambaService.takeScreenshot();
+    const screenshot = await this.dambaService.getScreenshot();
+    if (!screenshot) {
+      return {
+        screenshot: null,
+        isAuthenticated: this.dambaService.isAuthenticated,
+      };
+    }
+    return { screenshot };
   }
 
-  @Get('screenshot/download')
-  async downloadScreenshot(@Query('filepath') filepath: string) {
-    return this.dambaService.getScreenshotBuffer(filepath);
+  @Post('token')
+  async saveToken(@Body() saveDambaTokenDto: SaveDambaTokenDto) {
+    await this.dambaService.saveToken(saveDambaTokenDto.token);
+    return { success: true, message: 'Damba token saved successfully' };
   }
 }

@@ -1,18 +1,44 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
-import * as fs from 'fs';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from '@nestjs/common';
+import { Client, LocalAuth, MessageMedia, Message } from 'whatsapp-web.js';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { PrismaService } from '../prisma/prisma.service';
 import { DambaService } from '../damba/damba.service';
 
 @Injectable()
-export class WhatsappService implements OnModuleInit {
+export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(WhatsappService.name);
-  private client: Client;
-  private isReady = false;
+  private client: Client | null = null;
+  private qrCode: string | null = null;
+  private isReady: boolean = false;
 
-  constructor(private readonly dambaService: DambaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dambaService: DambaService,
+  ) {}
+
+  onModuleInit() {
+    this.initializeClient();
+  }
+
+  async onModuleDestroy() {
+    if (this.client) {
+      await this.client.destroy();
+      this.logger.log('WhatsApp client destroyed');
+    }
+  }
+
+  private initializeClient() {
+    const sessionPath = path.join(process.cwd(), 'whatsapp-session');
+
     this.client = new Client({
       authStrategy: new LocalAuth({
-        clientId: 'chatbot-client',
+        dataPath: sessionPath,
       }),
       puppeteer: {
         headless: true,
@@ -20,164 +46,254 @@ export class WhatsappService implements OnModuleInit {
       },
     });
 
-    this.setupEventHandlers();
-  }
-
-  async onModuleInit() {
-    await this.initializeClient();
-  }
-
-  private setupEventHandlers() {
     this.client.on('qr', (qr) => {
-      this.logger.log('QR Code received, scan it with WhatsApp');
-      // In a real application, you'd return this QR code to the frontend
-      // For now, we'll just log it
+      this.logger.log('QR code received');
+      this.qrCode = qr;
+      this.isReady = false;
     });
 
     this.client.on('ready', () => {
       this.logger.log('WhatsApp client is ready!');
       this.isReady = true;
+      this.qrCode = null;
     });
 
     this.client.on('authenticated', () => {
-      this.logger.log('WhatsApp authenticated!');
+      this.logger.log('WhatsApp client authenticated');
+      this.qrCode = null;
     });
 
     this.client.on('auth_failure', (msg) => {
-      this.logger.error('WhatsApp authentication failed:', msg);
+      this.logger.error('WhatsApp authentication failure:', msg);
+      this.isReady = false;
+      this.qrCode = null;
     });
 
     this.client.on('disconnected', (reason) => {
-      this.logger.warn('WhatsApp disconnected:', reason);
+      this.logger.warn('WhatsApp client disconnected:', reason);
       this.isReady = false;
+      this.qrCode = null;
+    });
+
+    this.client.on('loading_screen', (percent, message) => {
+      this.logger.log(`Loading: ${percent}% - ${message}`);
+    });
+
+    // Listen for incoming messages
+    this.client.on('message', (message: Message) => {
+      this.handleIncomingMessage(message).catch((error) => {
+        this.logger.error(
+          `Error in message handler: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    });
+
+    this.client.initialize().catch((error) => {
+      this.logger.error('Failed to initialize WhatsApp client:', error);
     });
   }
 
-  private async initializeClient() {
+  private async handleIncomingMessage(message: Message) {
     try {
-      await this.client.initialize();
-    } catch (error) {
-      this.logger.error('Failed to initialize WhatsApp client:', error);
-    }
-  }
-
-  async getQRCode(): Promise<string | null> {
-    return new Promise((resolve) => {
-      if (this.isReady) {
-        resolve(null); // Already authenticated
+      // Only process messages from groups
+      const chat = await message.getChat();
+      if (!chat.isGroup) {
         return;
       }
 
-      const timeout = setTimeout(() => {
-        resolve(null); // Timeout after 30 seconds
-      }, 30000);
+      const groupId = chat.id._serialized;
+      const messageBody = message.body?.toLowerCase() || '';
 
-      this.client.once('qr', (qr) => {
-        clearTimeout(timeout);
-        resolve(qr);
+      console.log('messageBody', messageBody);
+
+      // Get group settings
+      const settings = await this.prisma.groupScreenshotSettings.findUnique({
+        where: { groupId },
+        select: { reactOnMessage: true },
       });
-    });
+
+      // Check if reactOnMessage is configured and message contains it
+      const triggerWord = settings?.reactOnMessage as string | null | undefined;
+      if (triggerWord && typeof triggerWord === 'string') {
+        const lowerTrigger = triggerWord.toLowerCase();
+        if (messageBody.includes(lowerTrigger)) {
+          this.logger.log(
+            `Reacting to message "${triggerWord}" in group ${groupId}`,
+          );
+          await this.sendScreenshotOnMessage(groupId);
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error handling incoming message: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
-  async getStatus(): Promise<{
-    isReady: boolean;
-    info?: any;
-  }> {
-    const info = this.isReady ? await this.client.info : null;
-    return {
-      isReady: this.isReady,
-      info,
-    };
+  private async sendScreenshotOnMessage(groupId: string) {
+    try {
+      // Get screenshot
+      const screenshot = await this.dambaService.getScreenshot();
+      if (!screenshot) {
+        this.logger.warn('Failed to get screenshot for message reaction');
+        return;
+      }
+
+      // Get screenshot file path
+      const screenshotsDir = path.join(process.cwd(), 'screenshots');
+      const filename = screenshot.filename;
+      const filepath = path.join(screenshotsDir, filename);
+
+      // Check if file exists
+      try {
+        await fs.access(filepath);
+      } catch {
+        this.logger.error(`Screenshot file not found: ${filepath}`);
+        return;
+      }
+
+      // Read file as buffer
+      const fileBuffer = await fs.readFile(filepath);
+
+      // Create MessageMedia from buffer
+      const media = new MessageMedia(
+        'image/png',
+        fileBuffer.toString('base64'),
+        filename,
+      );
+
+      // Send to WhatsApp group
+      if (!this.client || !this.isReady) {
+        this.logger.error('WhatsApp client is not ready');
+        return;
+      }
+
+      const chat = await this.client.getChatById(groupId);
+      await chat.sendMessage(media);
+
+      this.logger.log(
+        `Screenshot sent to group ${groupId} in reaction to message`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error sending screenshot on message: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   async sendScreenshotToGroup(
     groupId: string,
-    screenshotPath?: string,
-    message?: string,
-  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    try {
-      if (!this.isReady) {
-        throw new Error('WhatsApp client is not ready');
-      }
-
-      // Take screenshot if path not provided
-      let filepath = screenshotPath;
-      if (!filepath) {
-        filepath = await this.dambaService.takeScreenshot();
-      }
-
-      if (!filepath || !fs.existsSync(filepath)) {
-        throw new Error('Screenshot file not found');
-      }
-
-      // Create media from screenshot
-      const media = MessageMedia.fromFilePath(filepath);
-
-      // Send message with media
-      const chat = await this.client.getChatById(groupId);
-      const sentMessage = await chat.sendMessage(media, {
-        caption: message || 'Screenshot from damba.live',
-      });
-
-      this.logger.log(`Screenshot sent to group ${groupId}`);
-      return {
-        success: true,
-        messageId: sentMessage.id.id,
-      };
-    } catch (error) {
-      this.logger.error(`Error sending screenshot to group: ${error.message}`);
-      return {
-        success: false,
-        error: error.message,
-      };
+    screenshotPath: string,
+    filename: string,
+  ): Promise<void> {
+    if (!this.client || !this.isReady) {
+      throw new Error('WhatsApp client is not ready');
     }
-  }
 
-  async getGroups(): Promise<
-    Array<{ id: string; name: string; isGroup: boolean }>
-  > {
     try {
-      if (!this.isReady) {
-        throw new Error('WhatsApp client is not ready');
+      // Check if file exists
+      try {
+        await fs.access(screenshotPath);
+      } catch {
+        this.logger.error(`Screenshot file not found: ${screenshotPath}`);
+        throw new Error(`Screenshot file not found: ${screenshotPath}`);
       }
 
-      const chats = await this.client.getChats();
-      return chats
-        .filter((chat) => chat.isGroup)
-        .map((chat) => ({
-          id: chat.id._serialized,
-          name: chat.name,
-          isGroup: chat.isGroup,
-        }));
+      // Read file as buffer
+      const fileBuffer = await fs.readFile(screenshotPath);
+
+      // Create MessageMedia from buffer
+      const media = new MessageMedia(
+        'image/png',
+        fileBuffer.toString('base64'),
+        filename,
+      );
+
+      // Send to WhatsApp group
+      const chat = await this.client.getChatById(groupId);
+      await chat.sendMessage(media);
+
+      this.logger.log(`Screenshot sent successfully to group ${groupId}`);
     } catch (error) {
-      this.logger.error(`Error getting groups: ${error.message}`);
+      this.logger.error(
+        `Error sending screenshot to group ${groupId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
       throw error;
     }
   }
 
-  async sendTextMessage(
-    chatId: string,
-    message: string,
-  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  getQRCode(): string | null {
+    return this.qrCode;
+  }
+
+  getStatus(): { isReady: boolean } {
+    return { isReady: this.isReady };
+  }
+
+  getClient(): Client | null {
+    return this.client;
+  }
+
+  async getGroups(): Promise<
+    Array<{
+      id: string;
+      name: string;
+      settings?: {
+        enabled: boolean;
+        intervalMinutes: number;
+      } | null;
+    }>
+  > {
+    if (!this.client || !this.isReady) {
+      throw new Error('WhatsApp client is not ready');
+    }
+
     try {
-      if (!this.isReady) {
-        throw new Error('WhatsApp client is not ready');
+      const chats = await this.client.getChats();
+      const groups = chats.filter((chat) => chat.isGroup);
+
+      // Get all group settings from database
+      const groupIds = groups.map((group) => group.id._serialized);
+      const settingsMap = new Map<
+        string,
+        { enabled: boolean; intervalMinutes: number }
+      >();
+
+      if (groupIds.length > 0) {
+        const settings = await this.prisma.groupScreenshotSettings.findMany({
+          where: {
+            groupId: {
+              in: groupIds,
+            },
+          },
+          select: {
+            groupId: true,
+            enabled: true,
+            intervalMinutes: true,
+          },
+        });
+
+        settings.forEach((setting) => {
+          settingsMap.set(setting.groupId, {
+            enabled: setting.enabled,
+            intervalMinutes: setting.intervalMinutes,
+          });
+        });
       }
 
-      const chat = await this.client.getChatById(chatId);
-      const sentMessage = await chat.sendMessage(message);
+      return groups.map((group) => {
+        const groupId = group.id._serialized;
+        const settings = settingsMap.get(groupId);
 
-      this.logger.log(`Text message sent to ${chatId}`);
-      return {
-        success: true,
-        messageId: sentMessage.id.id,
-      };
+        return {
+          id: groupId,
+          name: group.name,
+          settings: settings || null,
+        };
+      });
     } catch (error) {
-      this.logger.error(`Error sending text message: ${error.message}`);
-      return {
-        success: false,
-        error: error.message,
-      };
+      this.logger.error('Failed to get groups:', error);
+      throw new Error('Failed to retrieve groups');
     }
   }
 }

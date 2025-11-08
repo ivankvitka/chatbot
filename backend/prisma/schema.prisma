@@ -14,28 +14,25 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id         Int     @id @default(autoincrement())
-  email      String  @unique
-  name       String
-  password   String
-  dambaToken String?
+model AppConfig {
+  id            Int      @id @default(1) // Singleton pattern - always id = 1
+  dambaToken    String?  @map("damba_token")
+  dambaSettings Json?    @map("damba_settings")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  dambaSettingsId Int?           @unique
-  dambaSettings   DambaSettings? @relation(fields: [dambaSettingsId], references: [id])
-
-  @@map("users")
+  @@map("app_config")
 }
 
-model DambaSettings {
-  id        Int      @id @default(autoincrement())
-  settings  Json
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  user      User?
+model GroupScreenshotSettings {
+  id              Int      @id @default(autoincrement())
+  groupId         String   @unique @map("group_id")
+  groupName       String   @map("group_name")
+  intervalMinutes Int      @map("interval_minutes")
+  enabled         Boolean  @default(false)
+  reactOnMessage  String?  @map("react_on_message")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
-  @@map("damba_settings")
+  @@map("group_screenshot_settings")
 }
