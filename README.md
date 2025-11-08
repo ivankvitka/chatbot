@@ -1,12 +1,14 @@
-# Chatbot - Screenshot & WhatsApp Integration
+# Chatbot - Damba Screenshot & WhatsApp Integration
 
-A chatbot application that can authenticate users, take screenshots from websites, and send them to WhatsApp groups.
+An automated screenshot service that captures screenshots from Damba platform and sends them to WhatsApp groups on schedule or when triggered by specific messages.
 
 ## Features
 
-- 🔐 **Authentication**: JWT-based user authentication with bearer tokens
-- 📸 **Screenshot Capture**: Take screenshots from any website using Puppeteer
+- 📸 **Damba Integration**: Authenticate and capture screenshots from Damba platform
 - 📱 **WhatsApp Integration**: Send screenshots directly to WhatsApp groups
+- ⏰ **Scheduled Screenshots**: Automatically send screenshots at configurable intervals (1, 5, 10, 15, 30, or 60 minutes)
+- 💬 **Message-Triggered Screenshots**: React to specific keywords in group messages and send screenshots immediately
+- ⚙️ **Group Settings**: Configure individual settings for each WhatsApp group
 - 🎨 **Modern UI**: React-based frontend with responsive design
 - 🏗️ **NestJS Backend**: Robust API built with NestJS framework
 
@@ -15,18 +17,19 @@ A chatbot application that can authenticate users, take screenshots from website
 ### Backend
 
 - **NestJS**: Node.js framework for building scalable server-side applications
-- **PostgreSQL**: Primary database for user data and application state
+- **PostgreSQL**: Primary database for application state and group settings
 - **Prisma**: ORM for type-safe database operations
-- **Puppeteer**: Headless Chrome browser for screenshot capture
 - **whatsapp-web.js**: WhatsApp Web API integration
-- **JWT**: JSON Web Tokens for authentication
+- **@nestjs/schedule**: Task scheduling for automated screenshot sending
 - **TypeScript**: Strongly typed programming language
 
 ### Frontend
 
 - **React**: JavaScript library for building user interfaces
 - **Vite**: Fast build tool and development server
+- **Zustand**: State management for frontend
 - **Axios**: HTTP client for API requests
+- **Tailwind CSS**: Utility-first CSS framework
 - **TypeScript**: Strongly typed programming language
 
 ## Project Structure
@@ -40,24 +43,36 @@ chatbot/
 ├── .dockerignore              # Docker ignore file
 ├── backend/
 │   ├── prisma/
-│   │   ├── schema.prisma      # Database schema
-│   │   └── init.sql          # Database initialization
+│   │   └── schema.prisma      # Database schema
 │   ├── src/
-│   │   ├── auth/              # Authentication module
+│   │   ├── damba/             # Damba integration module
+│   │   ├── whatsapp/           # WhatsApp integration module
+│   │   │   ├── dto/            # Data transfer objects
+│   │   │   ├── group-settings.service.ts  # Group settings management
+│   │   │   ├── screenshot-scheduler.service.ts  # Scheduled screenshot sending
+│   │   │   ├── whatsapp.service.ts        # WhatsApp client service
+│   │   │   └── whatsapp.controller.ts     # WhatsApp API endpoints
 │   │   ├── prisma/            # Database service
-│   │   ├── screenshot/        # Screenshot capture module
-│   │   ├── whatsapp/          # WhatsApp integration module
 │   │   ├── common/            # Shared utilities and DTOs
 │   │   └── app.module.ts      # Main application module
 │   └── package.json
 └── frontend/
     ├── src/
-    │   ├── components/     # React components
-    │   │   ├── auth/       # Authentication components
-    │   │   ├── screenshot/ # Screenshot components
-    │   │   └── whatsapp/   # WhatsApp components
-    │   ├── services/       # API services
-    │   └── App.tsx         # Main React app
+    │   ├── components/        # React components
+    │   │   ├── DambaAuthModal.tsx      # Damba authentication
+    │   │   ├── GroupSettingsModal.tsx  # Group settings configuration
+    │   │   ├── Header.tsx              # Application header
+    │   │   ├── ScreenshotModal.tsx     # Screenshot viewer
+    │   │   ├── WhatsAppAuthModal.tsx   # WhatsApp QR authentication
+    │   │   └── WhatsAppGroupsList.tsx  # Groups list with settings
+    │   ├── services/          # API services
+    │   │   ├── damba.api.ts   # Damba API client
+    │   │   └── whatsapp.api.ts # WhatsApp API client
+    │   ├── stores/             # Zustand state management
+    │   │   ├── damba.store.ts  # Damba state
+    │   │   └── whatsapp.store.ts # WhatsApp state
+    │   └── pages/
+    │       └── Dashboard.tsx   # Main dashboard page
     └── package.json
 ```
 
@@ -158,7 +173,6 @@ make reset         # Reset everything (WARNING: deletes data)
 
    ```env
    DATABASE_URL="postgresql://username:password@localhost:5432/chatbot_db?schema=public"
-   JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
    ```
 
 5. Start the development server:
@@ -191,46 +205,57 @@ The frontend will be running on `http://localhost:5173`.
 
 ## Usage
 
-### Authentication
+### Damba Authentication
 
-1. Register a new account or login with existing credentials
-2. JWT tokens are automatically stored in localStorage
+1. Click the "Damba" button in the header
+2. Enter your Damba token in the modal
+3. The authentication status is indicated by a green (authenticated) or red (not authenticated) dot
 
-### Taking Screenshots
+### WhatsApp Authentication
 
-1. Navigate to the "Screenshot" tab
-2. Configure screenshot options (URL, dimensions, etc.)
-3. Click "Capture Screenshot" to take a screenshot
-4. Download the captured screenshot
+1. Click the "WhatsApp" button in the header
+2. Scan the QR code with your WhatsApp mobile app
+3. The connection status is indicated by a green dot when ready
 
-### WhatsApp Integration
+### Configuring Group Settings
 
-1. Navigate to the "WhatsApp" tab
-2. Authenticate with WhatsApp by scanning the QR code
-3. Select a WhatsApp group
-4. Use "Capture & Send Screenshot" to automatically capture and send screenshots
+1. View your WhatsApp groups in the dashboard
+2. Click the settings icon next to a group
+3. Configure the following options:
+   - **Enable automatic sending**: Toggle to enable/disable scheduled screenshots
+   - **Interval**: Choose how often to send screenshots (1, 5, 10, 15, 30, or 60 minutes)
+   - **React on message**: Enter a keyword (e.g., "небо") to trigger immediate screenshot sending when the word appears in group messages
+
+### Automatic Screenshot Sending
+
+- When enabled, screenshots are automatically sent to the group at the configured interval
+- The interval is displayed under the group name in the groups list
+- Screenshots are captured from the Damba platform
+
+### Message-Triggered Screenshots
+
+- When a keyword is configured in "React on message", the system monitors all messages in that group
+- If a message contains the keyword, a screenshot is immediately sent to the group
+- This works independently of the scheduled sending feature
 
 ## API Endpoints
 
-### Authentication
+### Damba
 
-- `POST /auth/login` - User login
-- `POST /auth/register` - User registration
-- `GET /auth/profile` - Get user profile
-
-### Screenshots
-
-- `POST /screenshot/capture` - Capture screenshot
-- `GET /screenshot/download` - Download screenshot
-- `GET /screenshot/view` - View screenshot
+- `GET /damba/screenshot` - Get latest screenshot from Damba platform
+- `POST /damba/token` - Save Damba authentication token
 
 ### WhatsApp
 
 - `GET /whatsapp/status` - Check WhatsApp connection status
 - `GET /whatsapp/qr` - Get QR code for authentication
-- `GET /whatsapp/groups` - Get user's WhatsApp groups
-- `POST /whatsapp/send-screenshot` - Send screenshot to group
-- `POST /whatsapp/capture-and-send` - Capture and send screenshot
+- `GET /whatsapp/groups` - Get user's WhatsApp groups with settings
+- `POST /whatsapp/send-screenshot` - Manually send screenshot to group
+- `POST /whatsapp/send-message` - Send text message to chat
+- `GET /whatsapp/groups/:groupId/settings` - Get group settings
+- `POST /whatsapp/groups/settings` - Create or update group settings
+- `PUT /whatsapp/groups/:groupId/settings` - Update group settings
+- `DELETE /whatsapp/groups/:groupId/settings` - Delete group settings
 
 ## Development
 
@@ -297,11 +322,11 @@ npm run build
 
 ## Security Notes
 
-- Change the JWT secret in production
 - Use HTTPS in production
+- Store Damba tokens securely
 - Validate and sanitize all user inputs
-- Store sensitive data securely
 - Implement rate limiting for API endpoints
+- Keep WhatsApp session data secure
 
 ## Contributing
 
