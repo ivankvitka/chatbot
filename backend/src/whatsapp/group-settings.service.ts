@@ -30,12 +30,14 @@ export class GroupSettingsService {
         groupName: dto.groupName,
         intervalMinutes: dto.intervalMinutes,
         enabled: dto.enabled,
+        reactOnMessage: dto.reactOnMessage || null,
       },
       create: {
         groupId: dto.groupId,
         groupName: dto.groupName,
         intervalMinutes: dto.intervalMinutes,
         enabled: dto.enabled,
+        reactOnMessage: dto.reactOnMessage || null,
       },
     });
 
@@ -65,6 +67,7 @@ export class GroupSettingsService {
         groupName: dto.groupName,
         intervalMinutes: dto.intervalMinutes,
         enabled: dto.enabled,
+        reactOnMessage: dto.reactOnMessage || null,
       },
     });
 

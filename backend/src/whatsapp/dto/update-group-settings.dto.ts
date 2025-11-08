@@ -1,4 +1,4 @@
-import { IsString, IsInt, IsBoolean, IsIn } from 'class-validator';
+import { IsString, IsInt, IsBoolean, IsIn, IsOptional } from 'class-validator';
 
 export class UpdateGroupSettingsDto {
   @IsString()
@@ -13,4 +13,8 @@ export class UpdateGroupSettingsDto {
 
   @IsBoolean()
   enabled: boolean;
+
+  @IsOptional()
+  @IsString()
+  reactOnMessage?: string;
 }

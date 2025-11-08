@@ -22,6 +22,7 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
   const [saving, setSaving] = useState(false);
   const [intervalMinutes, setIntervalMinutes] = useState(10);
   const [enabled, setEnabled] = useState(false);
+  const [reactOnMessage, setReactOnMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const loadSettings = useCallback(async () => {
@@ -32,10 +33,12 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
       if (response.settings) {
         setIntervalMinutes(response.settings.intervalMinutes);
         setEnabled(response.settings.enabled);
+        setReactOnMessage(response.settings.reactOnMessage || "");
       } else {
         // Default values if no settings exist
         setIntervalMinutes(10);
         setEnabled(false);
+        setReactOnMessage("");
       }
     } catch (err) {
       const errorMessage =
@@ -63,7 +66,8 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
         groupId,
         groupName,
         intervalMinutes,
-        enabled
+        enabled,
+        reactOnMessage || undefined
       );
       onSave?.();
       onClose();
@@ -182,6 +186,23 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Реагувати на повідомлення (ключове слово):
+              </label>
+              <input
+                type="text"
+                value={reactOnMessage}
+                onChange={(e) => setReactOnMessage(e.target.value)}
+                placeholder="наприклад: небо"
+                className="w-full px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Якщо вказано, скріншот буде відправлено негайно, коли в групі
+                з'явиться повідомлення з цим словом
+              </p>
             </div>
 
             {error && (

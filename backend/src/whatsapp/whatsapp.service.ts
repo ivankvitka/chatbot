@@ -4,10 +4,11 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
+import { Client, LocalAuth, MessageMedia, Message } from 'whatsapp-web.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
+import { DambaService } from '../damba/damba.service';
 
 @Injectable()
 export class WhatsappService implements OnModuleInit, OnModuleDestroy {
@@ -16,7 +17,10 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   private qrCode: string | null = null;
   private isReady: boolean = false;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly dambaService: DambaService,
+  ) {}
 
   onModuleInit() {
     this.initializeClient();
@@ -75,9 +79,106 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Loading: ${percent}% - ${message}`);
     });
 
+    // Listen for incoming messages
+    this.client.on('message', (message: Message) => {
+      this.handleIncomingMessage(message).catch((error) => {
+        this.logger.error(
+          `Error in message handler: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      });
+    });
+
     this.client.initialize().catch((error) => {
       this.logger.error('Failed to initialize WhatsApp client:', error);
     });
+  }
+
+  private async handleIncomingMessage(message: Message) {
+    try {
+      // Only process messages from groups
+      const chat = await message.getChat();
+      if (!chat.isGroup) {
+        return;
+      }
+
+      const groupId = chat.id._serialized;
+      const messageBody = message.body?.toLowerCase() || '';
+
+      console.log('messageBody', messageBody);
+
+      // Get group settings
+      const settings = await this.prisma.groupScreenshotSettings.findUnique({
+        where: { groupId },
+        select: { reactOnMessage: true },
+      });
+
+      // Check if reactOnMessage is configured and message contains it
+      const triggerWord = settings?.reactOnMessage as string | null | undefined;
+      if (triggerWord && typeof triggerWord === 'string') {
+        const lowerTrigger = triggerWord.toLowerCase();
+        if (messageBody.includes(lowerTrigger)) {
+          this.logger.log(
+            `Reacting to message "${triggerWord}" in group ${groupId}`,
+          );
+          await this.sendScreenshotOnMessage(groupId);
+        }
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error handling incoming message: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  private async sendScreenshotOnMessage(groupId: string) {
+    try {
+      // Get screenshot
+      const screenshot = await this.dambaService.getScreenshot();
+      if (!screenshot) {
+        this.logger.warn('Failed to get screenshot for message reaction');
+        return;
+      }
+
+      // Get screenshot file path
+      const screenshotsDir = path.join(process.cwd(), 'screenshots');
+      const filename = screenshot.filename;
+      const filepath = path.join(screenshotsDir, filename);
+
+      // Check if file exists
+      try {
+        await fs.access(filepath);
+      } catch {
+        this.logger.error(`Screenshot file not found: ${filepath}`);
+        return;
+      }
+
+      // Read file as buffer
+      const fileBuffer = await fs.readFile(filepath);
+
+      // Create MessageMedia from buffer
+      const media = new MessageMedia(
+        'image/png',
+        fileBuffer.toString('base64'),
+        filename,
+      );
+
+      // Send to WhatsApp group
+      if (!this.client || !this.isReady) {
+        this.logger.error('WhatsApp client is not ready');
+        return;
+      }
+
+      const chat = await this.client.getChatById(groupId);
+      await chat.sendMessage(media);
+
+      this.logger.log(
+        `Screenshot sent to group ${groupId} in reaction to message`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error sending screenshot on message: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
   }
 
   async sendScreenshotToGroup(

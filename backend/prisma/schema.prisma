@@ -30,6 +30,7 @@ model GroupScreenshotSettings {
   groupName       String   @map("group_name")
   intervalMinutes Int      @map("interval_minutes")
   enabled         Boolean  @default(false)
+  reactOnMessage  String?  @map("react_on_message")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
