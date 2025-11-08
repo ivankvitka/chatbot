@@ -53,10 +53,10 @@ export const Dashboard: React.FC = () => {
     loadScreenshot();
     getGroups();
 
-    // Set up automatic refresh every 10 seconds
+    // Set up automatic refresh every 60 seconds
     const intervalId = setInterval(() => {
       loadScreenshot(true);
-    }, 10000); // 10000 milliseconds = 10 seconds
+    }, 60000); // 60000 milliseconds = 60 seconds
 
     // Cleanup interval on component unmount
     return () => {
