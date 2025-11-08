@@ -3,13 +3,8 @@ import { createApiClient } from "./base.api";
 class DambaApi {
   private api = createApiClient();
 
-  async getScreenshotLink() {
+  async getScreenshot() {
     const response = await this.api.get("/damba/screenshot");
-    return response.data;
-  }
-
-  async getLastScreenshot() {
-    const response = await this.api.get("/damba/last-screenshot");
     return response.data;
   }
 

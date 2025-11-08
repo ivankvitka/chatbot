@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
-import { QRCodeSVG as QRCode } from 'qrcode.react';
-import { useWhatsAppStore } from '../stores/whatsapp.store';
+import React, { useEffect } from "react";
+import { QRCodeSVG as QRCode } from "qrcode.react";
+import { useWhatsAppStore } from "../stores/whatsapp.store";
 
 interface WhatsAppAuthModalProps {
   isOpen: boolean;
@@ -11,15 +11,15 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { 
-    status, 
-    qrCode, 
-    loading, 
-    error, 
-    checkStatus, 
-    loadQR, 
+  const {
+    status,
+    qrCode,
+    loading,
+    error,
+    checkStatus,
+    loadQR,
     setError,
-    clearQR 
+    clearQR,
   } = useWhatsAppStore();
 
   useEffect(() => {
@@ -46,13 +46,25 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-bold text-gray-900">WhatsApp Авторизація</h3>
+          <h3 className="text-lg font-bold text-gray-900">
+            WhatsApp Авторизація
+          </h3>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
@@ -60,11 +72,23 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
         {status?.isReady ? (
           <div className="text-center py-8">
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 mb-4">
-              <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              <svg
+                className="w-8 h-8 text-green-600"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M5 13l4 4L19 7"
+                />
               </svg>
             </div>
-            <p className="text-gray-700 font-medium">WhatsApp успішно підключено!</p>
+            <p className="text-gray-700 font-medium">
+              WhatsApp успішно підключено!
+            </p>
           </div>
         ) : (
           <div className="text-center py-4">
@@ -92,7 +116,9 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
               </div>
             ) : (
               <div className="py-8">
-                <p className="text-gray-600 mb-4">{error || 'QR код не доступний'}</p>
+                <p className="text-gray-600 mb-4">
+                  {error || "QR код не доступний"}
+                </p>
                 <button
                   onClick={loadQR}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
@@ -118,4 +144,3 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
 };
 
 export default WhatsAppAuthModal;
-

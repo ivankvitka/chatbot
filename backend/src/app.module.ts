@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
-import { AuthModule } from './auth/auth.module';
 import { WhatsappModule } from './whatsapp/whatsapp.module';
 import { DambaModule } from './damba/damba.module';
 import { ConfigModule } from '@nestjs/config';
@@ -14,7 +13,6 @@ import { ConfigModule } from '@nestjs/config';
     }),
     WhatsappModule,
     PrismaModule,
-    AuthModule,
     DambaModule,
   ],
   controllers: [AppController],

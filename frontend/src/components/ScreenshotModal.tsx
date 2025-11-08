@@ -5,6 +5,7 @@ interface ScreenshotModalProps {
   onClose: () => void;
   screenshotUrl: string;
   filename: string;
+  isAuthenticated?: boolean;
 }
 
 export const ScreenshotModal: React.FC<ScreenshotModalProps> = ({
@@ -12,6 +13,7 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = ({
   onClose,
   screenshotUrl,
   filename,
+  isAuthenticated = true,
 }) => {
   if (!isOpen) return null;
 
@@ -43,6 +45,13 @@ export const ScreenshotModal: React.FC<ScreenshotModalProps> = ({
             />
           </svg>
         </button>
+        {!isAuthenticated && (
+          <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-20 bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg">
+            <p className="text-lg font-semibold">
+              Користувач не автентифікований в Damba
+            </p>
+          </div>
+        )}
         <img
           src={screenshotUrl}
           alt={filename}

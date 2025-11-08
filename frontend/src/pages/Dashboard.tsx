@@ -9,6 +9,7 @@ interface Screenshot {
   filename: string;
   url: string;
   createdAt: string;
+  isAuthenticated?: boolean;
 }
 
 export const Dashboard: React.FC = () => {
@@ -19,13 +20,17 @@ export const Dashboard: React.FC = () => {
   const { getGroups } = useWhatsAppStore();
 
   useEffect(() => {
-    const loadLastScreenshot = async () => {
+    const loadScreenshot = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await dambaApi.getLastScreenshot();
+        const response = await dambaApi.getScreenshot();
         if (response.screenshot) {
           setScreenshot(response.screenshot);
+        } else if (response.isAuthenticated === false) {
+          setError(
+            "Користувач не автентифікований в Damba. Будь ласка, увійдіть в систему."
+          );
         }
       } catch (err) {
         const errorMessage =
@@ -39,7 +44,7 @@ export const Dashboard: React.FC = () => {
       }
     };
 
-    loadLastScreenshot();
+    loadScreenshot();
     getGroups();
   }, [getGroups]);
 
@@ -116,6 +121,7 @@ export const Dashboard: React.FC = () => {
           onClose={() => setIsModalOpen(false)}
           screenshotUrl={screenshot.url}
           filename={screenshot.filename}
+          isAuthenticated={screenshot.isAuthenticated}
         />
       )}
     </div>
