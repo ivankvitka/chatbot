@@ -181,67 +181,8 @@ export class DambaService {
     }
 
     try {
-      // Wait for page to be fully loaded before taking screenshot
-      // Check that page is on /map route and document is ready
-      await this.page.waitForFunction(
-        () =>
-          window.location.pathname === '/map' &&
-          document.readyState === 'complete',
-        { timeout: 10000 },
-      );
-
-      // Wait for all images and resources to load
-      await this.page
-        .evaluate(() => {
-          return Promise.all(
-            Array.from(document.images)
-              .filter((img) => !img.complete)
-              .map(
-                (img) =>
-                  new Promise<void>((resolve) => {
-                    img.onload = () => resolve();
-                    img.onerror = () => resolve(); // Resolve even on error to not block
-                    setTimeout(resolve, 5000); // Timeout after 5 seconds
-                  }),
-              ),
-          );
-        })
-        .catch(() => {
-          // Continue even if image loading check fails
-          this.logger.warn('Image loading check failed, continuing anyway');
-        });
-
-      // Wait for network to be idle - check performance API for recent activity
-      let networkIdle = false;
-      let attempts = 0;
-      const maxAttempts = 30; // 3 seconds total (30 * 100ms)
-
-      while (!networkIdle && attempts < maxAttempts) {
-        networkIdle = await this.page.evaluate(() => {
-          // Check performance API for recent network activity
-          const resources = performance.getEntriesByType(
-            'resource',
-          ) as PerformanceResourceTiming[];
-          const now = Date.now();
-          const recentResources = resources.filter((r) => {
-            // responseEnd is relative to navigationStart, convert to absolute time
-            const navigationStart = performance.timing.navigationStart;
-            const responseEndTime = navigationStart + r.responseEnd;
-            return now - responseEndTime < 500;
-          });
-
-          return recentResources.length === 0;
-        });
-
-        if (!networkIdle) {
-          // Wait 100ms before next check
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          attempts++;
-        }
-      }
-
       // Additional wait to ensure all content is rendered
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // Delete old screenshots before taking new one
       await this.deleteOldScreenshots();
