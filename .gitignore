@@ -147,3 +147,4 @@ puppeteer_cache/
 # pnpm-lock.yaml
 
 **/whatsapp-session.json/
+.cursorrules
