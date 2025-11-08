@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { dambaApi } from '../services/damba.api';
+import React, { useState } from "react";
+import { useDambaStore } from "../stores/damba.store";
 
 interface DambaAuthModalProps {
   isOpen: boolean;
@@ -10,34 +10,26 @@ export const DambaAuthModal: React.FC<DambaAuthModalProps> = ({
   isOpen,
   onClose,
 }) => {
-  const [dambaToken, setDambaToken] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [dambaToken, setDambaToken] = useState("");
+  const { loading, error, saveToken, setError } = useDambaStore();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    setError("");
 
     try {
-      await dambaApi.saveToken(dambaToken);
-      setDambaToken('');
+      await saveToken(dambaToken);
+      setDambaToken("");
       onClose();
-      alert('Damba токен успішно збережено!');
-    } catch (error: unknown) {
-      const errorMessage =
-        error && typeof error === 'object' && 'response' in error
-          ? (error as { response?: { data?: { message?: string } } }).response?.data?.message
-          : undefined;
-      setError(errorMessage || 'Помилка збереження токену');
-    } finally {
-      setLoading(false);
+      alert("Damba токен успішно збережено!");
+    } catch {
+      // Error is already set in store
     }
   };
 
   const handleClose = () => {
-    setDambaToken('');
-    setError('');
+    setDambaToken("");
+    setError("");
     onClose();
   };
 
@@ -58,15 +50,28 @@ export const DambaAuthModal: React.FC<DambaAuthModalProps> = ({
             onClick={handleClose}
             className="text-gray-400 hover:text-gray-600"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            <svg
+              className="w-6 h-6"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M6 18L18 6M6 6l12 12"
+              />
             </svg>
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="dambaToken" className="block text-sm font-medium text-gray-700 mb-2">
+            <label
+              htmlFor="dambaToken"
+              className="block text-sm font-medium text-gray-700 mb-2"
+            >
               Damba Token
             </label>
             <input
@@ -98,7 +103,7 @@ export const DambaAuthModal: React.FC<DambaAuthModalProps> = ({
               disabled={loading || !dambaToken}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? 'Збереження...' : 'Зберегти'}
+              {loading ? "Збереження..." : "Зберегти"}
             </button>
           </div>
         </form>
@@ -108,4 +113,3 @@ export const DambaAuthModal: React.FC<DambaAuthModalProps> = ({
 };
 
 export default DambaAuthModal;
-

@@ -12,6 +12,11 @@ class DambaApi {
     const response = await this.api.post("/damba/token", { token });
     return response.data;
   }
+
+  async getStatus() {
+    const response = await this.api.get("/damba/screenshot");
+    return { isAuthenticated: response.data.isAuthenticated ?? true };
+  }
 }
 
 export const dambaApi = new DambaApi();

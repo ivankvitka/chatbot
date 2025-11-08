@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useWhatsAppStore } from "../stores/whatsapp.store";
+import { useDambaStore } from "../stores/damba.store";
 import { WhatsAppAuthModal } from "./WhatsAppAuthModal";
 import { DambaAuthModal } from "./DambaAuthModal";
 
@@ -7,12 +8,15 @@ export const Header: React.FC = () => {
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showDambaModal, setShowDambaModal] = useState(false);
   const { status, checkStatus } = useWhatsAppStore();
+  const { isAuthenticated, checkStatus: checkDambaStatus } = useDambaStore();
 
   useEffect(() => {
     // Check WhatsApp status on mount and periodically
     checkStatus();
+    checkDambaStatus();
     const interval = setInterval(() => {
       checkStatus();
+      checkDambaStatus();
     }, 30000); // Check every 30 seconds
 
     return () => clearInterval(interval);
@@ -51,7 +55,7 @@ export const Header: React.FC = () => {
               </button>
               <button
                 onClick={() => setShowDambaModal(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200 relative"
               >
                 <svg
                   className="w-5 h-5 mr-2"
@@ -67,6 +71,16 @@ export const Header: React.FC = () => {
                   />
                 </svg>
                 Damba
+                <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                  {isAuthenticated ? (
+                    <>
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+                    </>
+                  ) : (
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+                  )}
+                </span>
               </button>
             </div>
           </div>
@@ -84,7 +98,11 @@ export const Header: React.FC = () => {
 
       <DambaAuthModal
         isOpen={showDambaModal}
-        onClose={() => setShowDambaModal(false)}
+        onClose={() => {
+          setShowDambaModal(false);
+          // Refresh status after modal closes
+          checkDambaStatus();
+        }}
       />
     </>
   );
