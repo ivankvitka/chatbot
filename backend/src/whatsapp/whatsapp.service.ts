@@ -4,7 +4,8 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import { Client, LocalAuth, MessageMedia } from 'whatsapp-web.js';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 
 @Injectable()
@@ -74,6 +75,47 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     this.client.initialize().catch((error) => {
       this.logger.error('Failed to initialize WhatsApp client:', error);
     });
+  }
+
+  async sendScreenshotToGroup(
+    groupId: string,
+    screenshotPath: string,
+    filename: string,
+  ): Promise<void> {
+    if (!this.client || !this.isReady) {
+      throw new Error('WhatsApp client is not ready');
+    }
+
+    try {
+      // Check if file exists
+      try {
+        await fs.access(screenshotPath);
+      } catch {
+        this.logger.error(`Screenshot file not found: ${screenshotPath}`);
+        throw new Error(`Screenshot file not found: ${screenshotPath}`);
+      }
+
+      // Read file as buffer
+      const fileBuffer = await fs.readFile(screenshotPath);
+
+      // Create MessageMedia from buffer
+      const media = new MessageMedia(
+        'image/png',
+        fileBuffer.toString('base64'),
+        filename,
+      );
+
+      // Send to WhatsApp group
+      const chat = await this.client.getChatById(groupId);
+      await chat.sendMessage(media);
+
+      this.logger.log(`Screenshot sent successfully to group ${groupId}`);
+    } catch (error) {
+      this.logger.error(
+        `Error sending screenshot to group ${groupId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
   }
 
   getQRCode(): string | null {

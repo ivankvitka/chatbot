@@ -15,37 +15,53 @@ interface Screenshot {
 export const Dashboard: React.FC = () => {
   const [screenshot, setScreenshot] = useState<Screenshot | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { getGroups } = useWhatsAppStore();
 
-  useEffect(() => {
-    const loadScreenshot = async () => {
-      try {
+  const loadScreenshot = async (isRefresh = false) => {
+    try {
+      if (isRefresh) {
+        setRefreshing(true);
+      } else {
         setLoading(true);
-        setError(null);
-        const response = await dambaApi.getScreenshot();
-        if (response.screenshot) {
-          setScreenshot(response.screenshot);
-        } else if (response.isAuthenticated === false) {
-          setError(
-            "Користувач не автентифікований в Damba. Будь ласка, увійдіть в систему."
-          );
-        }
-      } catch (err) {
-        const errorMessage =
-          err && typeof err === "object" && "response" in err
-            ? (err as { response?: { data?: { message?: string } } }).response
-                ?.data?.message
-            : undefined;
-        setError(errorMessage || "Не вдалося завантажити скріншот");
-      } finally {
-        setLoading(false);
       }
-    };
+      setError(null);
+      const response = await dambaApi.getScreenshot();
+      if (response.screenshot) {
+        setScreenshot(response.screenshot);
+      } else if (response.isAuthenticated === false) {
+        setError(
+          "Користувач не автентифікований в Damba. Будь ласка, увійдіть в систему."
+        );
+      }
+    } catch (err) {
+      const errorMessage =
+        err && typeof err === "object" && "response" in err
+          ? (err as { response?: { data?: { message?: string } } }).response
+              ?.data?.message
+          : undefined;
+      setError(errorMessage || "Не вдалося завантажити скріншот");
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
+  useEffect(() => {
     loadScreenshot();
     getGroups();
+
+    // Set up automatic refresh every 10 seconds
+    const intervalId = setInterval(() => {
+      loadScreenshot(true);
+    }, 10000); // 10000 milliseconds = 10 seconds
+
+    // Cleanup interval on component unmount
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [getGroups]);
 
   return (
@@ -62,17 +78,63 @@ export const Dashboard: React.FC = () => {
                 <h3 className="text-lg font-semibold text-gray-800">
                   Останній скріншот
                 </h3>
-                {screenshot && (
-                  <span className="text-sm text-gray-500">
-                    {new Date(screenshot.createdAt).toLocaleString("uk-UA", {
-                      year: "numeric",
-                      month: "long",
-                      day: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  {screenshot && (
+                    <span className="text-sm text-gray-500">
+                      {new Date(screenshot.createdAt).toLocaleString("uk-UA", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        second: "2-digit",
+                      })}
+                    </span>
+                  )}
+                  <button
+                    onClick={() => loadScreenshot(true)}
+                    disabled={loading || refreshing}
+                    className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                    title="Оновити скріншот"
+                  >
+                    {refreshing ? (
+                      <svg
+                        className="animate-spin h-4 w-4 text-gray-600"
+                        xmlns="http://www.w3.org/2000/svg"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                      >
+                        <circle
+                          className="opacity-25"
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                        ></circle>
+                        <path
+                          className="opacity-75"
+                          fill="currentColor"
+                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                        ></path>
+                      </svg>
+                    ) : (
+                      <svg
+                        className="h-4 w-4 text-gray-600"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                        />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
 
               {loading && (

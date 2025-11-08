@@ -23,3 +23,15 @@ model AppConfig {
 
   @@map("app_config")
 }
+
+model GroupScreenshotSettings {
+  id              Int      @id @default(autoincrement())
+  groupId         String   @unique @map("group_id")
+  groupName       String   @map("group_name")
+  intervalMinutes Int      @map("interval_minutes")
+  enabled         Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@map("group_screenshot_settings")
+}

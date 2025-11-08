@@ -255,7 +255,7 @@ export class DambaService {
       return {
         filename: screenshotFile,
         url,
-        createdAt: stats.mtime.toISOString(),
+        createdAt: stats.mtime.toISOString(), //Here should be seconds
         isAuthenticated: this.isAuthenticated,
       };
     } catch (error) {

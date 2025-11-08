@@ -38,6 +38,33 @@ class WhatsappApi {
     });
     return response.data;
   }
+
+  async getGroupSettings(groupId: string) {
+    const response = await this.api.get(`/whatsapp/groups/${groupId}/settings`);
+    return response.data;
+  }
+
+  async updateGroupSettings(
+    groupId: string,
+    groupName: string,
+    intervalMinutes: number,
+    enabled: boolean
+  ) {
+    const response = await this.api.post("/whatsapp/groups/settings", {
+      groupId,
+      groupName,
+      intervalMinutes,
+      enabled,
+    });
+    return response.data;
+  }
+
+  async deleteGroupSettings(groupId: string) {
+    const response = await this.api.delete(
+      `/whatsapp/groups/${groupId}/settings`
+    );
+    return response.data;
+  }
 }
 
 export const whatsappApi = new WhatsappApi();
