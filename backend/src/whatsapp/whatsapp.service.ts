@@ -87,4 +87,23 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
   getClient(): Client | null {
     return this.client;
   }
+
+  async getGroups(): Promise<Array<{ id: string; name: string }>> {
+    if (!this.client || !this.isReady) {
+      throw new Error('WhatsApp client is not ready');
+    }
+
+    try {
+      const chats = await this.client.getChats();
+      const groups = chats.filter((chat) => chat.isGroup);
+
+      return groups.map((group) => ({
+        id: group.id._serialized,
+        name: group.name,
+      }));
+    } catch (error) {
+      this.logger.error('Failed to get groups:', error);
+      throw new Error('Failed to retrieve groups');
+    }
+  }
 }

@@ -15,4 +15,9 @@ export class WhatsappController {
   getStatus() {
     return this.whatsappService.getStatus();
   }
+
+  @Get('groups')
+  async getGroups() {
+    return this.whatsappService.getGroups();
+  }
 }
