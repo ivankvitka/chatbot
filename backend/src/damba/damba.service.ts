@@ -5,6 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Alerts, DambaSettings } from './interfaces/DambaSettings.interface';
 
 @Injectable()
 export class DambaService {
@@ -105,8 +106,28 @@ export class DambaService {
     }
   }
 
-  async onModuleInit() {
-    // Check token expiration before initializing browser
+  /**
+   * Check if user is authenticated to Damba
+   * Updates authentication status before checking
+   * @returns true if authenticated, false otherwise
+   */
+  async isUserAuthenticated(): Promise<boolean> {
+    await this.checkTokenExpiration();
+    return this.isAuthenticated;
+  }
+
+  async launchBrowser() {
+    this.browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    this.page = await this.browser.newPage();
+  }
+
+  async authenticate() {
+    if (!this.browser || !this.page) {
+      throw new Error('Browser not initialized');
+    }
     const token = await this.getToken();
     await this.checkTokenExpiration(token);
 
@@ -118,14 +139,6 @@ export class DambaService {
         expiresAt = payload.exp;
       }
     }
-
-    // Initialize browser on module startup
-    this.browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-
-    this.page = await this.browser.newPage();
 
     await this.page.setViewport({
       width: 1920,
@@ -165,15 +178,81 @@ export class DambaService {
       expiresAt?.toString() || '',
     );
     // Wait for navigation to /map page to complete
-    await this.page.waitForNavigation({ waitUntil: 'networkidle2' });
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    const dambaSettings = await this.page.evaluate(() => {
+      return JSON.stringify(window.localStorage);
+    });
+
+    await this.prisma.appConfig.upsert({
+      where: { id: 1 },
+      update: { dambaSettings },
+      create: { id: 1, dambaSettings },
+    });
   }
 
-  async onModuleDestroy() {
-    // Close browser on module destroy
+  async onModuleInit() {
+    await this.launchBrowser();
+    await this.authenticate();
+  }
+
+  async closeBrowser() {
     if (this.browser) {
       await this.browser.close();
     }
   }
+
+  async onModuleDestroy() {
+    await this.closeBrowser();
+  }
+
+  shouldAlert = async () => {
+    if (!this.page) {
+      throw new Error('Page not initialized');
+    }
+    const result = await this.prisma.appConfig.findUnique({
+      where: { id: 1 },
+      select: { dambaSettings: true },
+    });
+
+    if (!result?.dambaSettings) {
+      return false;
+    }
+    const settings = JSON.parse(result.dambaSettings) as DambaSettings;
+
+    if (!settings.alerts) {
+      return false;
+    }
+    const settingsAlerts = (JSON.parse(settings.alerts) as Alerts).alerts;
+    const settingsFilteredAlertsLength = settingsAlerts.filter(
+      (alert) => alert.alertZoneIds.length > 0,
+    ).length;
+
+    const { dambaFilteredAlertsLength, newDambaSettings } =
+      await this.page.evaluate(() => {
+        const pageAlerts = window.localStorage.getItem('alerts') as string;
+        const dambaAlerts = (JSON.parse(pageAlerts) as Alerts).alerts;
+
+        return {
+          dambaFilteredAlertsLength: dambaAlerts.filter(
+            (alert) => alert.alertZoneIds.length > 0,
+          ).length,
+          newDambaSettings: JSON.stringify(window.localStorage),
+        };
+      });
+
+    await this.prisma.appConfig.upsert({
+      where: { id: 1 },
+      update: { dambaSettings: newDambaSettings },
+      create: { id: 1, dambaSettings: newDambaSettings },
+    });
+
+    return (
+      dambaFilteredAlertsLength > 0 &&
+      settingsFilteredAlertsLength > 0 &&
+      dambaFilteredAlertsLength !== settingsFilteredAlertsLength
+    );
+  };
 
   async takeScreenshot(): Promise<string> {
     if (!this.browser || !this.page) {
@@ -181,66 +260,6 @@ export class DambaService {
     }
 
     try {
-      // Wait for page to be fully loaded before taking screenshot
-      // Check that page is on /map route and document is ready
-      await this.page.waitForFunction(
-        () =>
-          window.location.pathname === '/map' &&
-          document.readyState === 'complete',
-        { timeout: 10000 },
-      );
-
-      // Wait for all images and resources to load
-      await this.page
-        .evaluate(() => {
-          return Promise.all(
-            Array.from(document.images)
-              .filter((img) => !img.complete)
-              .map(
-                (img) =>
-                  new Promise<void>((resolve) => {
-                    img.onload = () => resolve();
-                    img.onerror = () => resolve(); // Resolve even on error to not block
-                    setTimeout(resolve, 5000); // Timeout after 5 seconds
-                  }),
-              ),
-          );
-        })
-        .catch(() => {
-          // Continue even if image loading check fails
-          this.logger.warn('Image loading check failed, continuing anyway');
-        });
-
-      // Wait for network to be idle - check performance API for recent activity
-      let networkIdle = false;
-      let attempts = 0;
-      const maxAttempts = 30; // 3 seconds total (30 * 100ms)
-
-      while (!networkIdle && attempts < maxAttempts) {
-        networkIdle = await this.page.evaluate(() => {
-          // Check performance API for recent network activity
-          const resources = performance.getEntriesByType(
-            'resource',
-          ) as PerformanceResourceTiming[];
-          const now = Date.now();
-          const recentResources = resources.filter((r) => {
-            // responseEnd is relative to navigationStart, convert to absolute time
-            const navigationStart = performance.timing.navigationStart;
-            const responseEndTime = navigationStart + r.responseEnd;
-            return now - responseEndTime < 500;
-          });
-
-          return recentResources.length === 0;
-        });
-
-        if (!networkIdle) {
-          // Wait 100ms before next check
-          await new Promise((resolve) => setTimeout(resolve, 100));
-          attempts++;
-        }
-      }
-
-      // Additional wait to ensure all content is rendered
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Delete old screenshots before taking new one
@@ -319,7 +338,7 @@ export class DambaService {
       return {
         filename: screenshotFile,
         url,
-        createdAt: stats.mtime.toISOString(), //Here should be seconds
+        createdAt: stats.mtime.toISOString(),
         isAuthenticated: this.isAuthenticated,
       };
     } catch (error) {
@@ -363,6 +382,9 @@ export class DambaService {
         update: { dambaToken: token },
         create: { id: 1, dambaToken: token },
       });
+      await this.closeBrowser();
+      await this.launchBrowser();
+      await this.authenticate();
       this.logger.log('Damba token saved in app config');
     } catch (error) {
       this.logger.error(

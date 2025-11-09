@@ -23,6 +23,7 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
   const [intervalMinutes, setIntervalMinutes] = useState(10);
   const [enabled, setEnabled] = useState(false);
   const [reactOnMessage, setReactOnMessage] = useState("");
+  const [shouldAlert, setShouldAlert] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadSettings = useCallback(async () => {
@@ -34,11 +35,13 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
         setIntervalMinutes(response.settings.intervalMinutes);
         setEnabled(response.settings.enabled);
         setReactOnMessage(response.settings.reactOnMessage || "");
+        setShouldAlert(response.settings.shouldAlert || false);
       } else {
         // Default values if no settings exist
         setIntervalMinutes(10);
         setEnabled(false);
         setReactOnMessage("");
+        setShouldAlert(false);
       }
     } catch (err) {
       const errorMessage =
@@ -67,7 +70,8 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
         groupName,
         intervalMinutes,
         enabled,
-        reactOnMessage || undefined
+        reactOnMessage || undefined,
+        shouldAlert
       );
       onSave?.();
       onClose();
@@ -202,6 +206,24 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
               <p className="mt-1 text-xs text-gray-500">
                 Якщо вказано, скріншот буде відправлено негайно, коли в групі
                 з'явиться повідомлення з цим словом
+              </p>
+            </div>
+
+            <div className="mb-6">
+              <label className="flex items-center">
+                <input
+                  type="checkbox"
+                  checked={shouldAlert}
+                  onChange={(e) => setShouldAlert(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <span className="ml-2 text-sm font-medium text-gray-700">
+                  Відправляти скріншот при перетині зон
+                </span>
+              </label>
+              <p className="mt-1 ml-6 text-xs text-gray-500">
+                Скріншот буде автоматично відправлено в групу, коли відбудеться
+                перетин зони
               </p>
             </div>
 

@@ -10,6 +10,7 @@ import {
 import { WhatsappService } from './whatsapp.service';
 import { GroupSettingsService } from './group-settings.service';
 import { UpdateGroupSettingsDto } from './dto/update-group-settings.dto';
+import { SendMessageDto } from './dto/send-message.dto';
 
 @Controller('whatsapp')
 export class WhatsappController {
@@ -62,5 +63,27 @@ export class WhatsappController {
   @Delete('groups/:groupId/settings')
   async deleteGroupSettings(@Param('groupId') groupId: string) {
     return await this.groupSettingsService.deleteGroupSettings(groupId);
+  }
+
+  @Post('send-message')
+  async sendMessage(@Body() dto: SendMessageDto) {
+    const results: { groupId: string; success: boolean; error?: string }[] = [];
+    for (const groupId of dto.groupIds) {
+      try {
+        await this.whatsappService.sendMessageToGroup(
+          groupId,
+          dto.message,
+          true, // Always include screenshot
+        );
+        results.push({ groupId, success: true });
+      } catch (error) {
+        results.push({
+          groupId,
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return { results };
   }
 }

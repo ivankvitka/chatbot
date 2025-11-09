@@ -49,7 +49,8 @@ class WhatsappApi {
     groupName: string,
     intervalMinutes: number,
     enabled: boolean,
-    reactOnMessage?: string
+    reactOnMessage?: string,
+    shouldAlert?: boolean
   ) {
     const response = await this.api.post("/whatsapp/groups/settings", {
       groupId,
@@ -57,6 +58,7 @@ class WhatsappApi {
       intervalMinutes,
       enabled,
       reactOnMessage,
+      shouldAlert,
     });
     return response.data;
   }
@@ -65,6 +67,14 @@ class WhatsappApi {
     const response = await this.api.delete(
       `/whatsapp/groups/${groupId}/settings`
     );
+    return response.data;
+  }
+
+  async sendMessageToGroups(groupIds: string[], message?: string) {
+    const response = await this.api.post("/whatsapp/send-message", {
+      groupIds,
+      message,
+    });
     return response.data;
   }
 }

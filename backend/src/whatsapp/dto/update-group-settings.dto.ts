@@ -17,4 +17,8 @@ export class UpdateGroupSettingsDto {
   @IsOptional()
   @IsString()
   reactOnMessage?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  shouldAlert?: boolean;
 }
