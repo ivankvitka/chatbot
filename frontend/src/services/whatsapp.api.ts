@@ -67,6 +67,14 @@ class WhatsappApi {
     );
     return response.data;
   }
+
+  async sendMessageToGroups(groupIds: string[], message?: string) {
+    const response = await this.api.post("/whatsapp/send-message", {
+      groupIds,
+      message,
+    });
+    return response.data;
+  }
 }
 
 export const whatsappApi = new WhatsappApi();

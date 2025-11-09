@@ -1,12 +1,14 @@
-import { Controller, Get, Post, Body } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { DambaService } from './damba.service';
 import { SaveDambaTokenDto } from './dto/save-damba-token.dto';
+import { DambaAuthGuard } from './guards/damba-auth.guard';
 
 @Controller('damba')
 export class DambaController {
   constructor(private readonly dambaService: DambaService) {}
 
   @Get('screenshot')
+  @UseGuards(DambaAuthGuard)
   async getScreenshot() {
     const screenshot = await this.dambaService.getScreenshot();
     if (!screenshot) {

@@ -113,7 +113,7 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       });
 
       // Check if reactOnMessage is configured and message contains it
-      const triggerWord = settings?.reactOnMessage as string | null | undefined;
+      const triggerWord = settings?.reactOnMessage;
       if (triggerWord && typeof triggerWord === 'string') {
         const lowerTrigger = triggerWord.toLowerCase();
         if (messageBody.includes(lowerTrigger)) {
@@ -217,6 +217,80 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     } catch (error) {
       this.logger.error(
         `Error sending screenshot to group ${groupId}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Send message with optional screenshot to a group
+   * @param groupId - WhatsApp group ID
+   * @param message - Optional message text
+   * @param includeScreenshot - Whether to include screenshot
+   * @returns Promise<void>
+   */
+  async sendMessageToGroup(
+    groupId: string,
+    message?: string,
+    includeScreenshot: boolean = true,
+  ): Promise<void> {
+    if (!this.client || !this.isReady) {
+      throw new Error('WhatsApp client is not ready');
+    }
+
+    try {
+      const chat = await this.client.getChatById(groupId);
+
+      // If screenshot should be included, get it from Damba
+      if (includeScreenshot) {
+        const screenshot = await this.dambaService.getScreenshot();
+        if (screenshot) {
+          const screenshotsDir = path.join(process.cwd(), 'screenshots');
+          const filepath = path.join(screenshotsDir, screenshot.filename);
+
+          // Check if file exists
+          try {
+            await fs.access(filepath);
+            const fileBuffer = await fs.readFile(filepath);
+
+            // Create MessageMedia from buffer
+            const media = new MessageMedia(
+              'image/png',
+              fileBuffer.toString('base64'),
+              screenshot.filename,
+            );
+
+            // Send screenshot with optional caption
+            if (message && message.trim()) {
+              await chat.sendMessage(media, { caption: message });
+            } else {
+              await chat.sendMessage(media);
+            }
+
+            this.logger.log(
+              `Message with screenshot sent successfully to group ${groupId}`,
+            );
+            return;
+          } catch {
+            this.logger.warn(
+              `Screenshot file not found: ${filepath}, sending message only`,
+            );
+          }
+        } else {
+          this.logger.warn('Screenshot not available, sending message only');
+        }
+      }
+
+      // Send message only if provided
+      if (message && message.trim()) {
+        await chat.sendMessage(message);
+        this.logger.log(`Message sent successfully to group ${groupId}`);
+      } else if (!includeScreenshot) {
+        throw new Error('Message is required when screenshot is not included');
+      }
+    } catch (error) {
+      this.logger.error(
+        `Error sending message to group ${groupId}: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
     }

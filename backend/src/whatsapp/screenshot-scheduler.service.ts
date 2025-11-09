@@ -194,6 +194,15 @@ export class ScreenshotSchedulerService
         return;
       }
 
+      // Check if user is authenticated to Damba before getting screenshot
+      const isAuthenticated = await this.dambaService.isUserAuthenticated();
+      if (!isAuthenticated) {
+        this.logger.warn(
+          'User is not authenticated to Damba, skipping screenshot',
+        );
+        return;
+      }
+
       // Get screenshot
       const screenshot = await this.dambaService.getScreenshot();
       if (!screenshot) {

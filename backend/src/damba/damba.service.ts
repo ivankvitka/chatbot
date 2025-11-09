@@ -105,6 +105,16 @@ export class DambaService {
     }
   }
 
+  /**
+   * Check if user is authenticated to Damba
+   * Updates authentication status before checking
+   * @returns true if authenticated, false otherwise
+   */
+  async isUserAuthenticated(): Promise<boolean> {
+    await this.checkTokenExpiration();
+    return this.isAuthenticated;
+  }
+
   async launchBrowser() {
     this.browser = await puppeteer.launch({
       headless: true,
