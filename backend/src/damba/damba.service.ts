@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import * as puppeteer from 'puppeteer';
+import { chromium, Browser, Page } from 'playwright';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Logger } from '@nestjs/common';
@@ -20,8 +20,8 @@ export class DambaService {
     this.API_URL = this.configService.getOrThrow<string>('API_URL');
   }
   private readonly logger = new Logger(DambaService.name);
-  private browser: puppeteer.Browser | null = null;
-  private page: puppeteer.Page | null = null;
+  private browser: Browser | null = null;
+  private page: Page | null = null;
 
   /**
    * Decodes JWT token and returns the payload
@@ -117,7 +117,7 @@ export class DambaService {
   }
 
   async launchBrowser() {
-    this.browser = await puppeteer.launch({
+    this.browser = await chromium.launch({
       headless: true,
       args: ['--no-sandbox', '--disable-setuid-sandbox'],
     });
@@ -140,13 +140,13 @@ export class DambaService {
       }
     }
 
-    await this.page.setViewport({
+    await this.page.setViewportSize({
       width: 1920,
       height: 1080,
     });
-    await this.page.goto('https://damba.live/', { waitUntil: 'networkidle2' });
+    await this.page.goto('https://damba.live/');
     await this.page.evaluate(
-      (refreshToken: string, tokenExpires: string) => {
+      ({ refreshToken, tokenExpires }) => {
         const sessionData = {
           ['refresh-token']: refreshToken,
           ['refresh-token-expires']: tokenExpires,
@@ -174,11 +174,13 @@ export class DambaService {
         );
         document.location.pathname = '/map';
       },
-      token || '',
-      expiresAt?.toString() || '',
+      {
+        refreshToken: token || '',
+        tokenExpires: expiresAt?.toString() || '',
+      },
     );
     // Wait for navigation to /map page to complete
-    await new Promise((resolve) => setTimeout(resolve, 10000));
+    await this.page.waitForURL('**/map', { timeout: 15000 });
 
     const dambaSettings = await this.page.evaluate(() => {
       return JSON.stringify(window.localStorage);
@@ -260,7 +262,8 @@ export class DambaService {
     }
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+      // Wait for page to be fully loaded using Playwright's better waiting
+      await this.page.waitForLoadState('domcontentloaded');
 
       // Delete old screenshots before taking new one
       await this.deleteOldScreenshots();
