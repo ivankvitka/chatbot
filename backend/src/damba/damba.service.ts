@@ -260,7 +260,6 @@ export class DambaService {
     }
 
     try {
-      await this.shouldAlert();
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Delete old screenshots before taking new one
