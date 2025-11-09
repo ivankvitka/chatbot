@@ -17,7 +17,7 @@ datasource db {
 model AppConfig {
   id            Int      @id @default(1) // Singleton pattern - always id = 1
   dambaToken    String?  @map("damba_token")
-  dambaSettings Json?    @map("damba_settings")
+  dambaSettings String?  @map("damba_settings")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 

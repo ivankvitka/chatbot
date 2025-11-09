@@ -5,6 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Alerts, DambaSettings } from './interfaces/DambaSettings.interface';
 
 @Injectable()
 export class DambaService {
@@ -144,7 +145,7 @@ export class DambaService {
       height: 1080,
     });
     await this.page.goto('https://damba.live/', { waitUntil: 'networkidle2' });
-    const dambaSettings = await this.page.evaluate(
+    await this.page.evaluate(
       (refreshToken: string, tokenExpires: string) => {
         const sessionData = {
           ['refresh-token']: refreshToken,
@@ -172,13 +173,16 @@ export class DambaService {
           '[50.91410065304415,34.39479231834412]',
         );
         document.location.pathname = '/map';
-        return JSON.stringify(window.localStorage);
       },
       token || '',
       expiresAt?.toString() || '',
     );
     // Wait for navigation to /map page to complete
-    await this.page.waitForNavigation({ waitUntil: 'networkidle2' });
+    await new Promise((resolve) => setTimeout(resolve, 10000));
+
+    const dambaSettings = await this.page.evaluate(() => {
+      return JSON.stringify(window.localStorage);
+    });
 
     await this.prisma.appConfig.upsert({
       where: { id: 1 },
@@ -202,12 +206,61 @@ export class DambaService {
     await this.closeBrowser();
   }
 
+  shouldAlert = async () => {
+    if (!this.page) {
+      throw new Error('Page not initialized');
+    }
+    const result = await this.prisma.appConfig.findUnique({
+      where: { id: 1 },
+      select: { dambaSettings: true },
+    });
+
+    if (!result?.dambaSettings) {
+      return false;
+    }
+    const settings = JSON.parse(result.dambaSettings) as DambaSettings;
+
+    if (!settings.alerts) {
+      return false;
+    }
+    const settingsAlerts = (JSON.parse(settings.alerts) as Alerts).alerts;
+    const settingsFilteredAlertsLength = settingsAlerts.filter(
+      (alert) => alert.alertZoneIds.length > 0,
+    ).length;
+
+    const { dambaFilteredAlertsLength, newDambaSettings } =
+      await this.page.evaluate(() => {
+        const pageAlerts = window.localStorage.getItem('alerts') as string;
+        const dambaAlerts = (JSON.parse(pageAlerts) as Alerts).alerts;
+
+        return {
+          dambaFilteredAlertsLength: dambaAlerts.filter(
+            (alert) => alert.alertZoneIds.length > 0,
+          ).length,
+          newDambaSettings: JSON.stringify(window.localStorage),
+        };
+      });
+
+    await this.prisma.appConfig.upsert({
+      where: { id: 1 },
+      update: { dambaSettings: newDambaSettings },
+      create: { id: 1, dambaSettings: newDambaSettings },
+    });
+
+    return (
+      dambaFilteredAlertsLength > 0 &&
+      settingsFilteredAlertsLength > 0 &&
+      dambaFilteredAlertsLength !== settingsFilteredAlertsLength
+    );
+  };
+
   async takeScreenshot(): Promise<string> {
     if (!this.browser || !this.page) {
       throw new Error('Browser not initialized');
     }
 
     try {
+      await this.shouldAlert();
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // Delete old screenshots before taking new one
