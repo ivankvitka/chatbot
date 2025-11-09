@@ -105,8 +105,18 @@ export class DambaService {
     }
   }
 
-  async onModuleInit() {
-    // Check token expiration before initializing browser
+  async launchBrowser() {
+    this.browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+    this.page = await this.browser.newPage();
+  }
+
+  async authenticate() {
+    if (!this.browser || !this.page) {
+      throw new Error('Browser not initialized');
+    }
     const token = await this.getToken();
     await this.checkTokenExpiration(token);
 
@@ -119,20 +129,12 @@ export class DambaService {
       }
     }
 
-    // Initialize browser on module startup
-    this.browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-
-    this.page = await this.browser.newPage();
-
     await this.page.setViewport({
       width: 1920,
       height: 1080,
     });
     await this.page.goto('https://damba.live/', { waitUntil: 'networkidle2' });
-    await this.page.evaluate(
+    const dambaSettings = await this.page.evaluate(
       (refreshToken: string, tokenExpires: string) => {
         const sessionData = {
           ['refresh-token']: refreshToken,
@@ -160,19 +162,34 @@ export class DambaService {
           '[50.91410065304415,34.39479231834412]',
         );
         document.location.pathname = '/map';
+        return JSON.stringify(window.localStorage);
       },
       token || '',
       expiresAt?.toString() || '',
     );
     // Wait for navigation to /map page to complete
     await this.page.waitForNavigation({ waitUntil: 'networkidle2' });
+
+    await this.prisma.appConfig.upsert({
+      where: { id: 1 },
+      update: { dambaSettings },
+      create: { id: 1, dambaSettings },
+    });
   }
 
-  async onModuleDestroy() {
-    // Close browser on module destroy
+  async onModuleInit() {
+    await this.launchBrowser();
+    await this.authenticate();
+  }
+
+  async closeBrowser() {
     if (this.browser) {
       await this.browser.close();
     }
+  }
+
+  async onModuleDestroy() {
+    await this.closeBrowser();
   }
 
   async takeScreenshot(): Promise<string> {
@@ -363,6 +380,9 @@ export class DambaService {
         update: { dambaToken: token },
         create: { id: 1, dambaToken: token },
       });
+      await this.closeBrowser();
+      await this.launchBrowser();
+      await this.authenticate();
       this.logger.log('Damba token saved in app config');
     } catch (error) {
       this.logger.error(
