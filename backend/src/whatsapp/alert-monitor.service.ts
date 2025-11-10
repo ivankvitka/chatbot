@@ -13,7 +13,7 @@ import * as path from 'path';
 export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AlertMonitorService.name);
   private interval: NodeJS.Timeout | null = null;
-  private readonly CHECK_INTERVAL = 60000; // Check every 60 seconds
+  private readonly CHECK_INTERVAL = 5000; // Check every 60 seconds
 
   constructor(
     private readonly prisma: PrismaService,
@@ -68,6 +68,17 @@ export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
         );
         return;
       }
+      // Get all groups with shouldAlert enabled
+      const groups = await this.prisma.groupScreenshotSettings.findMany({
+        where: {
+          shouldAlert: true,
+        },
+      });
+
+      if (groups.length === 0) {
+        this.logger.log('No groups with shouldAlert enabled found');
+        return;
+      }
 
       // Check if shouldAlert returns true
       const shouldAlert = await this.dambaService.shouldAlert();
@@ -78,19 +89,6 @@ export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(
         'Alert changes detected, sending screenshots to groups with shouldAlert enabled',
       );
-
-      // Get all groups with shouldAlert enabled
-      const groups = await this.prisma.groupScreenshotSettings.findMany({
-        where: {
-          shouldAlert: true,
-          enabled: true, // Also check if group is enabled
-        },
-      });
-
-      if (groups.length === 0) {
-        this.logger.log('No groups with shouldAlert enabled found');
-        return;
-      }
 
       // Get screenshot using DambaService
       const screenshot = await this.dambaService.getScreenshot();
