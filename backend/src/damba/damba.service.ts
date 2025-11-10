@@ -252,7 +252,6 @@ export class DambaService {
       create: { id: 1, dambaSettings: newDambaSettings },
     });
 
-    console.log(dambaFilteredAlertsLength, settingsFilteredAlertsLength);
     return (
       dambaFilteredAlertsLength > 0 &&
       settingsFilteredAlertsLength > 0 &&

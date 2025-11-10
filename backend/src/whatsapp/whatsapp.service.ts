@@ -104,8 +104,6 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       const groupId = chat.id._serialized;
       const messageBody = message.body?.toLowerCase() || '';
 
-      console.log('messageBody', messageBody);
-
       // Get group settings
       const settings = await this.prisma.groupScreenshotSettings.findUnique({
         where: { groupId },
