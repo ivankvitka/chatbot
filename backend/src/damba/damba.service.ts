@@ -89,9 +89,6 @@ export class DambaService {
           );
         } else {
           this.isAuthenticated = true;
-          this.logger.log(
-            `Damba token is valid. Expires at: ${new Date(expirationTime).toISOString()}`,
-          );
         }
       } else {
         // If no expiration field, consider token as valid
@@ -180,12 +177,11 @@ export class DambaService {
       },
     );
     // Wait for navigation to /map page to complete
-    await this.page.waitForURL('**/map', { timeout: 15000 });
+    await this.page.waitForURL('**/map');
 
     const dambaSettings = await this.page.evaluate(() => {
       return JSON.stringify(window.localStorage);
     });
-
     await this.prisma.appConfig.upsert({
       where: { id: 1 },
       update: { dambaSettings },
@@ -216,20 +212,6 @@ export class DambaService {
       where: { id: 1 },
       select: { dambaSettings: true },
     });
-
-    if (!result?.dambaSettings) {
-      return false;
-    }
-    const settings = JSON.parse(result.dambaSettings) as DambaSettings;
-
-    if (!settings.alerts) {
-      return false;
-    }
-    const settingsAlerts = (JSON.parse(settings.alerts) as Alerts).alerts;
-    const settingsFilteredAlertsLength = settingsAlerts.filter(
-      (alert) => alert.alertZoneIds.length > 0,
-    ).length;
-
     const { dambaFilteredAlertsLength, newDambaSettings } =
       await this.page.evaluate(() => {
         const pageAlerts = window.localStorage.getItem('alerts') as string;
@@ -240,8 +222,29 @@ export class DambaService {
             (alert) => alert.alertZoneIds.length > 0,
           ).length,
           newDambaSettings: JSON.stringify(window.localStorage),
+          dambaFilteredAlerts: dambaAlerts.filter(
+            (alert) => alert.alertZoneIds.length > 0,
+          ),
         };
       });
+
+    if (!result?.dambaSettings) {
+      return false;
+    }
+    const settings = JSON.parse(result.dambaSettings) as DambaSettings;
+
+    if (!settings.alerts) {
+      await this.prisma.appConfig.upsert({
+        where: { id: 1 },
+        update: { dambaSettings: newDambaSettings },
+        create: { id: 1, dambaSettings: newDambaSettings },
+      });
+      return false;
+    }
+    const settingsAlerts = (JSON.parse(settings.alerts) as Alerts).alerts;
+    const settingsFilteredAlertsLength = settingsAlerts.filter(
+      (alert) => alert.alertZoneIds.length > 0,
+    ).length;
 
     await this.prisma.appConfig.upsert({
       where: { id: 1 },
@@ -249,6 +252,7 @@ export class DambaService {
       create: { id: 1, dambaSettings: newDambaSettings },
     });
 
+    console.log(dambaFilteredAlertsLength, settingsFilteredAlertsLength);
     return (
       dambaFilteredAlertsLength > 0 &&
       settingsFilteredAlertsLength > 0 &&
@@ -286,7 +290,6 @@ export class DambaService {
         fullPage: true,
       });
 
-      this.logger.log(`Screenshot saved to ${filepath}`);
       return filepath;
     } catch (error) {
       this.logger.error(
@@ -366,7 +369,6 @@ export class DambaService {
         if (file.startsWith('screenshot-') && file.endsWith('.png')) {
           const filepath = path.join(screenshotsDir, file);
           await fs.unlink(filepath);
-          this.logger.log(`Screenshot deleted: ${filepath}`);
         }
       }
     } catch (error) {
