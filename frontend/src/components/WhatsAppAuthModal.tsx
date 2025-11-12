@@ -18,6 +18,7 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
     error,
     checkStatus,
     loadQR,
+    logout,
     setError,
     clearQR,
   } = useWhatsAppStore();
@@ -86,9 +87,46 @@ export const WhatsAppAuthModal: React.FC<WhatsAppAuthModalProps> = ({
                 />
               </svg>
             </div>
-            <p className="text-gray-700 font-medium">
+            <p className="text-gray-700 font-medium mb-4">
               WhatsApp успішно підключено!
             </p>
+            <button
+              onClick={async () => {
+                try {
+                  await logout();
+                  checkStatus();
+                  loadQR();
+                } catch (err) {
+                  console.error("Failed to logout:", err);
+                }
+              }}
+              disabled={loading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+            >
+              {loading ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                  <span>Вихід...</span>
+                </>
+              ) : (
+                <>
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"
+                    />
+                  </svg>
+                  <span>Вийти з WhatsApp</span>
+                </>
+              )}
+            </button>
           </div>
         ) : (
           <div className="text-center py-4">

@@ -13,6 +13,11 @@ class WhatsappApi {
     return response.data;
   }
 
+  async logout() {
+    const response = await this.api.post("/whatsapp/logout");
+    return response.data;
+  }
+
   async getGroups() {
     const response = await this.api.get("/whatsapp/groups");
     return response.data;

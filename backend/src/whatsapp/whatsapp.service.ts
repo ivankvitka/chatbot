@@ -79,8 +79,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       this.logger.log(`Loading: ${percent}% - ${message}`);
     });
 
-    // Listen for incoming messages
-    this.client.on('message', (message: Message) => {
+    // Listen for incoming messages (including messages from self)
+    this.client.on('message_create', (message: Message) => {
       this.handleIncomingMessage(message).catch((error) => {
         this.logger.error(
           `Error in message handler: ${error instanceof Error ? error.message : String(error)}`,
@@ -95,14 +95,50 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
 
   private async handleIncomingMessage(message: Message) {
     try {
-      // Only process messages from groups
-      const chat = await message.getChat();
-      if (!chat.isGroup) {
+      // Skip status messages
+      if (message.isStatus) {
         return;
       }
 
+      const chat = await message.getChat();
+      const messageBody = message.body?.trim() || '';
+
+      this.logger.debug(
+        `Received message from ${message.fromMe ? 'self' : 'other'}: ${messageBody.substring(0, 50)}`,
+      );
+
+      // Handle personal messages for token authentication
+      if (!chat.isGroup) {
+        // Check if message matches token format: token/{tokenvalue}
+        const tokenMatch = messageBody.match(/^token\/(.+)$/i);
+        if (tokenMatch) {
+          const tokenValue = tokenMatch[1];
+          this.logger.log(
+            'Received token authentication request from personal chat',
+          );
+
+          try {
+            await this.dambaService.saveToken(tokenValue);
+            await this.sendPersonalMessage(
+              chat.id._serialized,
+              '✅ Damba token успішно збережено та аутентифікацію виконано!',
+            );
+            this.logger.log('Damba token saved successfully via WhatsApp');
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : String(error);
+            this.logger.error(`Failed to save Damba token: ${errorMessage}`);
+            await this.sendPersonalMessage(
+              chat.id._serialized,
+              `❌ Помилка при збереженні токену: ${errorMessage}`,
+            );
+          }
+        }
+        return;
+      }
+
+      // Process group messages
       const groupId = chat.id._serialized;
-      const messageBody = message.body?.toLowerCase() || '';
 
       // Get group settings
       const settings = await this.prisma.groupScreenshotSettings.findUnique({
@@ -114,7 +150,8 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       const triggerWord = settings?.reactOnMessage;
       if (triggerWord && typeof triggerWord === 'string') {
         const lowerTrigger = triggerWord.toLowerCase();
-        if (messageBody.includes(lowerTrigger)) {
+        const lowerMessageBody = messageBody.toLowerCase();
+        if (lowerMessageBody.includes(lowerTrigger)) {
           this.logger.log(
             `Reacting to message "${triggerWord}" in group ${groupId}`,
           );
@@ -128,6 +165,92 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private async sendPersonalMessage(
+    chatId: string,
+    message: string,
+  ): Promise<void> {
+    if (!this.client || !this.isReady) {
+      this.logger.error('WhatsApp client is not ready');
+      return;
+    }
+
+    try {
+      const chat = await this.client.getChatById(chatId);
+      await chat.sendMessage(message);
+      this.logger.log(`Personal message sent to ${chatId}`);
+    } catch (error) {
+      this.logger.error(
+        `Error sending personal message: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /**
+   * Creates MessageMedia from file path
+   * @param filepath - Path to the file
+   * @param filename - Name of the file
+   * @returns MessageMedia instance or null if file doesn't exist
+   */
+  private async createMediaFromFile(
+    filepath: string,
+    filename: string,
+  ): Promise<MessageMedia | null> {
+    try {
+      await fs.access(filepath);
+    } catch {
+      this.logger.error(`Screenshot file not found: ${filepath}`);
+      return null;
+    }
+
+    try {
+      const fileBuffer = await fs.readFile(filepath);
+      return new MessageMedia(
+        'image/png',
+        fileBuffer.toString('base64'),
+        filename,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Error reading file ${filepath}: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
+    }
+  }
+
+  /**
+   * Sends media to a WhatsApp group
+   * @param groupId - WhatsApp group ID
+   * @param media - MessageMedia to send
+   * @param caption - Optional caption for the media
+   * @returns Promise<void>
+   */
+  private async sendMediaToGroup(
+    groupId: string,
+    media: MessageMedia,
+    caption?: string,
+  ): Promise<void> {
+    if (!this.client || !this.isReady) {
+      throw new Error('WhatsApp client is not ready');
+    }
+
+    const chat = await this.client.getChatById(groupId);
+    if (caption && caption.trim()) {
+      await chat.sendMessage(media, { caption });
+    } else {
+      await chat.sendMessage(media);
+    }
+  }
+
+  /**
+   * Gets screenshot file path from screenshot object
+   * @param screenshot - Screenshot object with filename
+   * @returns Full file path to the screenshot
+   */
+  private getScreenshotFilePath(filename: string): string {
+    const screenshotsDir = path.join(process.cwd(), 'screenshots');
+    return path.join(screenshotsDir, filename);
+  }
+
   private async sendScreenshotOnMessage(groupId: string) {
     try {
       // Get screenshot
@@ -137,37 +260,17 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      // Get screenshot file path
-      const screenshotsDir = path.join(process.cwd(), 'screenshots');
-      const filename = screenshot.filename;
-      const filepath = path.join(screenshotsDir, filename);
-
-      // Check if file exists
-      try {
-        await fs.access(filepath);
-      } catch {
-        this.logger.error(`Screenshot file not found: ${filepath}`);
-        return;
-      }
-
-      // Read file as buffer
-      const fileBuffer = await fs.readFile(filepath);
-
-      // Create MessageMedia from buffer
-      const media = new MessageMedia(
-        'image/png',
-        fileBuffer.toString('base64'),
-        filename,
+      const filepath = this.getScreenshotFilePath(screenshot.filename);
+      const media = await this.createMediaFromFile(
+        filepath,
+        screenshot.filename,
       );
 
-      // Send to WhatsApp group
-      if (!this.client || !this.isReady) {
-        this.logger.error('WhatsApp client is not ready');
+      if (!media) {
         return;
       }
 
-      const chat = await this.client.getChatById(groupId);
-      await chat.sendMessage(media);
+      await this.sendMediaToGroup(groupId, media);
 
       this.logger.log(
         `Screenshot sent to group ${groupId} in reaction to message`,
@@ -184,33 +287,13 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     screenshotPath: string,
     filename: string,
   ): Promise<void> {
-    if (!this.client || !this.isReady) {
-      throw new Error('WhatsApp client is not ready');
-    }
-
     try {
-      // Check if file exists
-      try {
-        await fs.access(screenshotPath);
-      } catch {
-        this.logger.error(`Screenshot file not found: ${screenshotPath}`);
+      const media = await this.createMediaFromFile(screenshotPath, filename);
+      if (!media) {
         throw new Error(`Screenshot file not found: ${screenshotPath}`);
       }
 
-      // Read file as buffer
-      const fileBuffer = await fs.readFile(screenshotPath);
-
-      // Create MessageMedia from buffer
-      const media = new MessageMedia(
-        'image/png',
-        fileBuffer.toString('base64'),
-        filename,
-      );
-
-      // Send to WhatsApp group
-      const chat = await this.client.getChatById(groupId);
-      await chat.sendMessage(media);
-
+      await this.sendMediaToGroup(groupId, media);
       this.logger.log(`Screenshot sent successfully to group ${groupId}`);
     } catch (error) {
       this.logger.error(
@@ -243,33 +326,19 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       if (includeScreenshot) {
         const screenshot = await this.dambaService.getScreenshot();
         if (screenshot) {
-          const screenshotsDir = path.join(process.cwd(), 'screenshots');
-          const filepath = path.join(screenshotsDir, screenshot.filename);
+          const filepath = this.getScreenshotFilePath(screenshot.filename);
+          const media = await this.createMediaFromFile(
+            filepath,
+            screenshot.filename,
+          );
 
-          // Check if file exists
-          try {
-            await fs.access(filepath);
-            const fileBuffer = await fs.readFile(filepath);
-
-            // Create MessageMedia from buffer
-            const media = new MessageMedia(
-              'image/png',
-              fileBuffer.toString('base64'),
-              screenshot.filename,
-            );
-
-            // Send screenshot with optional caption
-            if (message && message.trim()) {
-              await chat.sendMessage(media, { caption: message });
-            } else {
-              await chat.sendMessage(media);
-            }
-
+          if (media) {
+            await this.sendMediaToGroup(groupId, media, message);
             this.logger.log(
               `Message with screenshot sent successfully to group ${groupId}`,
             );
             return;
-          } catch {
+          } else {
             this.logger.warn(
               `Screenshot file not found: ${filepath}, sending message only`,
             );
@@ -306,6 +375,54 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     return this.client;
   }
 
+  /**
+   * Logout from WhatsApp and clear session data
+   * @returns Promise<void>
+   */
+  async logout(): Promise<void> {
+    try {
+      if (this.client) {
+        try {
+          // Logout from WhatsApp
+          await this.client.logout();
+          this.logger.log('Logged out from WhatsApp');
+        } catch (error) {
+          this.logger.warn(
+            `Error during logout: ${error instanceof Error ? error.message : String(error)}`,
+          );
+        }
+
+        // Destroy client
+        await this.client.destroy();
+        this.client = null;
+      }
+
+      // Clear state
+      this.isReady = false;
+      this.qrCode = null;
+
+      // Delete session files
+      const sessionPath = path.join(process.cwd(), 'whatsapp-session');
+      try {
+        await fs.rm(sessionPath, { recursive: true, force: true });
+        this.logger.log('Session files deleted');
+      } catch (error) {
+        this.logger.warn(
+          `Error deleting session files: ${error instanceof Error ? error.message : String(error)}`,
+        );
+      }
+
+      // Reinitialize client to allow new authentication
+      this.initializeClient();
+      this.logger.log('WhatsApp client reinitialized after logout');
+    } catch (error) {
+      this.logger.error(
+        `Error during logout process: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
   async getGroups(): Promise<
     Array<{
       id: string;
@@ -317,7 +434,10 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
     }>
   > {
     if (!this.client || !this.isReady) {
-      throw new Error('WhatsApp client is not ready');
+      this.logger.warn(
+        'WhatsApp client is not ready, returning empty groups list',
+      );
+      return [];
     }
 
     try {
