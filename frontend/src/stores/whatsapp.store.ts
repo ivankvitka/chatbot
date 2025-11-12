@@ -25,6 +25,7 @@ interface WhatsAppState {
   // Actions
   checkStatus: () => Promise<void>;
   loadQR: () => Promise<void>;
+  logout: () => Promise<void>;
   getGroups: () => Promise<void>;
   sendScreenshot: (
     groupId: string,
@@ -89,6 +90,31 @@ export const useWhatsAppStore = create<WhatsAppState>((set) => ({
         error: errorMessage,
         qrCode: null,
       });
+    }
+  },
+
+  logout: async () => {
+    try {
+      set({ loading: true, error: null });
+      await whatsappApi.logout();
+      // Clear state after logout
+      set({
+        status: { isReady: false },
+        qrCode: null,
+        groups: [],
+        loading: false,
+        error: null,
+      });
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof AxiosError
+          ? error.response?.data?.message || "Помилка виходу з WhatsApp"
+          : "Помилка виходу з WhatsApp";
+      set({
+        loading: false,
+        error: errorMessage,
+      });
+      throw error;
     }
   },
 

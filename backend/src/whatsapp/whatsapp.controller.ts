@@ -30,6 +30,12 @@ export class WhatsappController {
     return this.whatsappService.getStatus();
   }
 
+  @Post('logout')
+  async logout() {
+    await this.whatsappService.logout();
+    return { success: true, message: 'Logged out successfully' };
+  }
+
   @Get('groups')
   async getGroups() {
     return this.whatsappService.getGroups();
