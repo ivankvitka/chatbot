@@ -4,31 +4,23 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
+import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronJob } from 'cron';
 import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappService } from './whatsapp.service';
 import { DambaService } from '../damba/damba.service';
-import { MessageMedia } from 'whatsapp-web.js';
-import * as fs from 'fs/promises';
-import * as path from 'path';
-
-interface ScheduledJob {
-  timeout: NodeJS.Timeout | null;
-  interval: NodeJS.Timeout | null;
-  groupId: string;
-  intervalMinutes: number;
-}
 
 @Injectable()
 export class ScreenshotSchedulerService
   implements OnModuleInit, OnModuleDestroy
 {
   private readonly logger = new Logger(ScreenshotSchedulerService.name);
-  private readonly jobs = new Map<string, ScheduledJob>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsappService: WhatsappService,
     private readonly dambaService: DambaService,
+    private readonly schedulerRegistry: SchedulerRegistry,
   ) {}
 
   async onModuleInit() {
@@ -56,9 +48,7 @@ export class ScreenshotSchedulerService
 
       this.logger.log(`Loaded and started ${settings.length} screenshot jobs`);
     } catch (error) {
-      this.logger.error(
-        `Error loading jobs: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`Error loading jobs: ${this.getErrorMessage(error)}`);
     }
   }
 
@@ -79,64 +69,36 @@ export class ScreenshotSchedulerService
         return;
       }
 
-      // Calculate next execution time to align with minute intervals
-      // For example, if interval is 10 minutes, execute at :10, :20, :30, etc.
-      const now = new Date();
-      const currentMinutes = now.getMinutes();
-      const intervalMinutes = setting.intervalMinutes;
+      // Create cron expression: every N minutes
+      // Format: */N * * * * means "every N minutes"
+      const cronExpression = `*/${setting.intervalMinutes} * * * *`;
 
-      // Calculate minutes until next interval
-      const minutesUntilNext =
-        intervalMinutes - (currentMinutes % intervalMinutes);
-      const nextExecution = new Date(now);
-      nextExecution.setMinutes(now.getMinutes() + minutesUntilNext);
-      nextExecution.setSeconds(0);
-      nextExecution.setMilliseconds(0);
+      const jobName = `screenshot-${groupId}`;
 
-      const delayUntilNext = nextExecution.getTime() - now.getTime();
-
-      // Schedule first execution
-      const timeout = setTimeout(() => {
-        // Send immediately
-        this.sendScreenshotToGroup(groupId).catch((error) => {
-          this.logger.error(
-            `Error in scheduled job for group ${groupId}: ${error instanceof Error ? error.message : String(error)}`,
-          );
-        });
-
-        // Then schedule recurring execution every intervalMinutes
-        const interval = setInterval(
-          () => {
-            this.sendScreenshotToGroup(groupId).catch((error) => {
-              this.logger.error(
-                `Error in scheduled job for group ${groupId}: ${error instanceof Error ? error.message : String(error)}`,
-              );
-            });
-          },
-          intervalMinutes * 60 * 1000,
-        );
-
-        // Update job with interval
-        const job = this.jobs.get(groupId);
-        if (job) {
-          job.timeout = null;
-          job.interval = interval;
-        }
-      }, delayUntilNext);
-
-      this.jobs.set(groupId, {
-        timeout: timeout,
-        interval: null,
-        groupId: groupId,
-        intervalMinutes: intervalMinutes,
-      });
-
-      this.logger.log(
-        `Started screenshot job for group ${groupId} (${setting.groupName}) - interval: ${setting.intervalMinutes} minutes`,
+      // Create cron job for recurring executions
+      // Pass cronTime as first parameter (string), then callback, then config object
+      const cronJob = new CronJob(
+        cronExpression, // cronTime as string
+        () => {
+          this.sendScreenshotToGroup(groupId).catch((error) => {
+            this.logger.error(
+              `Error in scheduled job for group ${groupId}: ${this.getErrorMessage(error)}`,
+            );
+          });
+        },
+        null, // onComplete callback
+        false, // start - Don't start immediately
+        undefined, // timezone - use system default
       );
+
+      // Register the cron job
+      // Type mismatch between cron library and @nestjs/schedule expected types
+      // @ts-expect-error - CronJob from 'cron' is compatible but has different type signature
+      this.schedulerRegistry.addCronJob(jobName, cronJob);
+      cronJob.start();
     } catch (error) {
       this.logger.error(
-        `Error starting job for group ${groupId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Error starting job for group ${groupId}: ${this.getErrorMessage(error)}`,
       );
     }
   }
@@ -145,27 +107,43 @@ export class ScreenshotSchedulerService
    * Stop a job for a specific group
    */
   stopJob(groupId: string) {
-    const job = this.jobs.get(groupId);
+    const jobName = `screenshot-${groupId}`;
+    this.removeJobFromRegistry(jobName);
+    this.logger.log(`Stopped screenshot job for group ${groupId}`);
+  }
 
-    if (job) {
-      if (job.timeout) {
-        clearTimeout(job.timeout);
-      }
-      if (job.interval) {
-        clearInterval(job.interval);
-      }
-      this.jobs.delete(groupId);
-      this.logger.log(`Stopped screenshot job for group ${groupId}`);
+  /**
+   * Remove a cron job from the registry if it exists
+   * This is a helper method to avoid code duplication
+   */
+  private removeJobFromRegistry(jobName: string): void {
+    if (this.schedulerRegistry.doesExist('cron', jobName)) {
+      const cronJob = this.schedulerRegistry.getCronJob(jobName);
+      void cronJob.stop();
+      this.schedulerRegistry.deleteCronJob(jobName);
     }
+  }
+
+  /**
+   * Helper method to extract error message from unknown error type
+   * This avoids code duplication for error handling
+   */
+  private getErrorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error);
   }
 
   /**
    * Stop all jobs
    */
   stopAllJobs() {
-    for (const [groupId] of this.jobs) {
-      this.stopJob(groupId);
-    }
+    const cronJobs = this.schedulerRegistry.getCronJobs();
+    cronJobs.forEach((job, jobName) => {
+      // Extract groupId from job name: "screenshot-{groupId}"
+      if (jobName.startsWith('screenshot-')) {
+        const groupId = jobName.replace('screenshot-', '');
+        this.stopJob(groupId);
+      }
+    });
   }
 
   /**
@@ -197,9 +175,6 @@ export class ScreenshotSchedulerService
       // Check if user is authenticated to Damba before getting screenshot
       const isAuthenticated = await this.dambaService.isUserAuthenticated();
       if (!isAuthenticated) {
-        this.logger.warn(
-          'User is not authenticated to Damba, skipping screenshot',
-        );
         return;
       }
 
@@ -210,39 +185,14 @@ export class ScreenshotSchedulerService
         return;
       }
 
-      // Get screenshot file path
-      const screenshotsDir = path.join(process.cwd(), 'screenshots');
-      const filename = screenshot.filename;
-      const filepath = path.join(screenshotsDir, filename);
-
-      // Check if file exists
-      try {
-        await fs.access(filepath);
-      } catch {
-        this.logger.error(`Screenshot file not found: ${filepath}`);
-        return;
-      }
-
-      // Read file as buffer
-      const fileBuffer = await fs.readFile(filepath);
-
-      // Create MessageMedia from buffer
-      const media = new MessageMedia(
-        'image/png',
-        fileBuffer.toString('base64'),
-        filename,
-      );
-
-      // Send to WhatsApp group
-      const chat = await client.getChatById(groupId);
-      await chat.sendMessage(media);
-
-      this.logger.log(
-        `Screenshot sent successfully to group ${setting.groupName} (${groupId})`,
+      await this.whatsappService.sendScreenshotToGroup(
+        groupId,
+        screenshot.filepath,
+        screenshot.filename,
       );
     } catch (error) {
       this.logger.error(
-        `Error sending screenshot to group ${groupId}: ${error instanceof Error ? error.message : String(error)}`,
+        `Error sending screenshot to group ${groupId}: ${this.getErrorMessage(error)}`,
       );
     }
   }

@@ -32,7 +32,6 @@ export class DambaService {
     try {
       const tokenParts = token.split('.');
       if (tokenParts.length !== 3) {
-        this.logger.warn('Invalid token format');
         return null;
       }
 
@@ -300,6 +299,7 @@ export class DambaService {
 
   async getScreenshot(): Promise<{
     filename: string;
+    filepath: string;
     url: string;
     createdAt: string;
     isAuthenticated: boolean;
@@ -308,9 +308,6 @@ export class DambaService {
     await this.checkTokenExpiration();
 
     if (!this.isAuthenticated) {
-      this.logger.warn(
-        'User is not authenticated to Damba, cannot take screenshot',
-      );
       return null;
     }
 
@@ -342,6 +339,7 @@ export class DambaService {
 
       return {
         filename: screenshotFile,
+        filepath,
         url,
         createdAt: stats.mtime.toISOString(),
         isAuthenticated: this.isAuthenticated,
