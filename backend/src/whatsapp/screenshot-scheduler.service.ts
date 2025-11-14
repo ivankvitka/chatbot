@@ -92,8 +92,9 @@ export class ScreenshotSchedulerService
       );
 
       // Register the cron job
-      // Type assertion needed due to generic type mismatch in @nestjs/schedule
-      this.schedulerRegistry.addCronJob(jobName, cronJob as any);
+      // Type mismatch between cron library and @nestjs/schedule expected types
+      // @ts-expect-error - CronJob from 'cron' is compatible but has different type signature
+      this.schedulerRegistry.addCronJob(jobName, cronJob);
       cronJob.start();
     } catch (error) {
       this.logger.error(
