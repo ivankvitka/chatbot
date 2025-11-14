@@ -63,9 +63,6 @@ export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
       // Check if user is authenticated
       const isAuthenticated = await this.dambaService.isUserAuthenticated();
       if (!isAuthenticated) {
-        this.logger.warn(
-          'User is not authenticated to Damba, skipping alert check',
-        );
         return;
       }
       // Get all groups with shouldAlert enabled
@@ -76,7 +73,6 @@ export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
       });
 
       if (groups.length === 0) {
-        this.logger.log('No groups with shouldAlert enabled found');
         return;
       }
 

@@ -103,10 +103,6 @@ export class WhatsappService implements OnModuleInit, OnModuleDestroy {
       const chat = await message.getChat();
       const messageBody = message.body?.trim() || '';
 
-      this.logger.debug(
-        `Received message from ${message.fromMe ? 'self' : 'other'}: ${messageBody.substring(0, 50)}`,
-      );
-
       // Handle personal messages for token authentication
       if (!chat.isGroup) {
         // Check if message matches token format: token/{tokenvalue}

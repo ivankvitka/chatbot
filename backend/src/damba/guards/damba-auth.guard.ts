@@ -17,7 +17,6 @@ export class DambaAuthGuard implements CanActivate {
     await this.dambaService.checkTokenExpiration();
 
     if (!this.dambaService.isAuthenticated) {
-      this.logger.warn('User is not authenticated to Damba');
       throw new UnauthorizedException(
         'User is not authenticated to Damba. Please authenticate first.',
       );
