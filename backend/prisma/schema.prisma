@@ -32,8 +32,19 @@ model GroupScreenshotSettings {
   enabled         Boolean  @default(false)
   reactOnMessage  String?  @map("react_on_message")
   shouldAlert     Boolean  @default(false) @map("should_alert")
+  zoneIds         String[] @default([]) @map("zone_ids")
   createdAt       DateTime @default(now()) @map("created_at")
   updatedAt       DateTime @updatedAt @map("updated_at")
 
   @@map("group_screenshot_settings")
+}
+
+model Zone {
+  id        Int      @id @default(autoincrement())
+  zoneId    String   @unique @map("zone_id")
+  name      String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("zones")
 }

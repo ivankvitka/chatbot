@@ -3,11 +3,13 @@ import { useWhatsAppStore } from "../stores/whatsapp.store";
 import { useDambaStore } from "../stores/damba.store";
 import { WhatsAppAuthModal } from "./WhatsAppAuthModal";
 import { DambaAuthModal } from "./DambaAuthModal";
+import { ZonesManagementModal } from "./ZonesManagementModal";
 import { AuthStatusButton } from "./AuthStatusButton";
 
 export const Header: React.FC = () => {
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showDambaModal, setShowDambaModal] = useState(false);
+  const [showZonesModal, setShowZonesModal] = useState(false);
   const { status, checkStatus } = useWhatsAppStore();
   const { isAuthenticated, checkStatus: checkDambaStatus } = useDambaStore();
 
@@ -35,6 +37,26 @@ export const Header: React.FC = () => {
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowZonesModal(true)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
+                title="Управління зонами"
+              >
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"
+                  />
+                </svg>
+                Зони
+              </button>
               <AuthStatusButton
                 label="WhatsApp"
                 icon={
@@ -87,6 +109,11 @@ export const Header: React.FC = () => {
           // Refresh status after modal closes
           checkDambaStatus();
         }}
+      />
+
+      <ZonesManagementModal
+        isOpen={showZonesModal}
+        onClose={() => setShowZonesModal(false)}
       />
     </>
   );

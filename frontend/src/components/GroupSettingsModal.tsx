@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { whatsappApi } from "../services/whatsapp.api";
+import { dambaApi, type Zone } from "../services/damba.api";
 
 interface GroupSettingsModalProps {
   isOpen: boolean;
@@ -24,6 +25,8 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
   const [enabled, setEnabled] = useState(false);
   const [reactOnMessage, setReactOnMessage] = useState("");
   const [shouldAlert, setShouldAlert] = useState(false);
+  const [zoneIds, setZoneIds] = useState<string[]>([]);
+  const [zones, setZones] = useState<Zone[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const loadSettings = useCallback(async () => {
@@ -36,12 +39,14 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
         setEnabled(response.settings.enabled);
         setReactOnMessage(response.settings.reactOnMessage || "");
         setShouldAlert(response.settings.shouldAlert || false);
+        setZoneIds(response.settings.zoneIds || []);
       } else {
         // Default values if no settings exist
         setIntervalMinutes(10);
         setEnabled(false);
         setReactOnMessage("");
         setShouldAlert(false);
+        setZoneIds([]);
       }
     } catch (err) {
       const errorMessage =
@@ -55,11 +60,22 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
     }
   }, [groupId]);
 
+  const loadZones = useCallback(async () => {
+    try {
+      const zones = await dambaApi.getAllZones();
+      setZones(zones);
+    } catch {
+      // Silently fail - zones are optional
+      setZones([]);
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       loadSettings();
+      loadZones();
     }
-  }, [isOpen, loadSettings]);
+  }, [isOpen, loadSettings, loadZones]);
 
   const handleSave = async () => {
     try {
@@ -71,7 +87,8 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
         intervalMinutes,
         enabled,
         reactOnMessage || undefined,
-        shouldAlert
+        shouldAlert,
+        zoneIds.length > 0 ? zoneIds : undefined
       );
       onSave?.();
       onClose();
@@ -225,6 +242,69 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
                 Скріншот буде автоматично відправлено в групу, коли відбудеться
                 перетин зони
               </p>
+              {shouldAlert && (
+                <div className="mt-4 ml-6">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Зони для відстеження (залиште порожнім для всіх зон):
+                  </label>
+                  {zones.length > 0 ? (
+                    <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3">
+                      {zones.map((zone) => (
+                        <label
+                          key={zone.id}
+                          className="flex items-center cursor-pointer hover:bg-gray-50 p-1 rounded"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={zoneIds.includes(zone.zoneId)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setZoneIds([...zoneIds, zone.zoneId]);
+                              } else {
+                                setZoneIds(
+                                  zoneIds.filter((id) => id !== zone.zoneId)
+                                );
+                              }
+                            }}
+                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">
+                            {zone.name}{" "}
+                            <span className="text-gray-400">
+                              ({zone.zoneId})
+                            </span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-xs text-gray-500">
+                      Немає збережених зон. Додайте зони через меню "Зони" в
+                      шапці.
+                    </div>
+                  )}
+                  {zoneIds.length > 0 && (
+                    <div className="mt-2">
+                      <p className="text-xs text-gray-500 mb-1">
+                        Вибрані зони:{" "}
+                        {zoneIds
+                          .map((id) => {
+                            const zone = zones.find((z) => z.zoneId === id);
+                            return zone ? `${zone.name} (${id})` : id;
+                          })
+                          .join(", ")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setZoneIds([])}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >
+                        Очистити вибір
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {error && (

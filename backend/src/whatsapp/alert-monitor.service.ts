@@ -76,14 +76,14 @@ export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
-      // Check if shouldAlert returns true
-      const shouldAlert = await this.dambaService.shouldAlert();
-      if (!shouldAlert) {
+      // Check if shouldAlert returns true and get alertZoneIds
+      const alertResult = await this.dambaService.shouldAlert();
+      if (!alertResult.hasAlert) {
         return; // No alert changes detected
       }
 
       this.logger.log(
-        'Alert changes detected, sending screenshots to groups with shouldAlert enabled',
+        `Alert changes detected with zone IDs: ${alertResult.alertZoneIds.join(', ')}, sending screenshots to matching groups`,
       );
 
       // Get screenshot using DambaService
@@ -97,8 +97,24 @@ export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
       const screenshotsDir = path.join(process.cwd(), 'screenshots');
       const filepath = path.join(screenshotsDir, screenshot.filename);
 
-      // Send to all groups with shouldAlert enabled using WhatsappService
+      // Send to groups with shouldAlert enabled and matching zoneIds
       for (const group of groups) {
+        // If group has zoneIds configured, check if any of them match alertZoneIds
+        // If group has no zoneIds configured, send to all (backward compatibility)
+        const groupZoneIds = group.zoneIds || [];
+        const shouldSendToGroup =
+          groupZoneIds.length === 0 ||
+          groupZoneIds.some((zoneId) =>
+            alertResult.alertZoneIds.includes(zoneId),
+          );
+
+        if (!shouldSendToGroup) {
+          this.logger.debug(
+            `Skipping group ${group.groupName} (${group.groupId}) - no matching zone IDs`,
+          );
+          continue;
+        }
+
         try {
           await this.whatsappService.sendScreenshotToGroup(
             group.groupId,

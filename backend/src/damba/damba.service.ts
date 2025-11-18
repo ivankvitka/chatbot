@@ -5,7 +5,11 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Alerts, DambaSettings } from './interfaces/DambaSettings.interface';
+import {
+  Alerts,
+  AlertsData,
+  DambaSettings,
+} from './interfaces/DambaSettings.interface';
 
 @Injectable()
 export class DambaService {
@@ -203,7 +207,10 @@ export class DambaService {
     await this.closeBrowser();
   }
 
-  shouldAlert = async () => {
+  shouldAlert = async (): Promise<{
+    hasAlert: boolean;
+    alertZoneIds: string[];
+  }> => {
     if (!this.page) {
       throw new Error('Page not initialized');
     }
@@ -211,7 +218,7 @@ export class DambaService {
       where: { id: 1 },
       select: { dambaSettings: true },
     });
-    const { dambaFilteredAlertsLength, newDambaSettings } =
+    const { dambaFilteredAlertsLength, newDambaSettings, dambaFilteredAlerts } =
       await this.page.evaluate(() => {
         const pageAlerts = window.localStorage.getItem('alerts') as string;
         const dambaAlerts = (JSON.parse(pageAlerts) as Alerts).alerts;
@@ -228,7 +235,7 @@ export class DambaService {
       });
 
     if (!result?.dambaSettings) {
-      return false;
+      return { hasAlert: false, alertZoneIds: [] };
     }
     const settings = JSON.parse(result.dambaSettings) as DambaSettings;
 
@@ -238,9 +245,11 @@ export class DambaService {
         update: { dambaSettings: newDambaSettings },
         create: { id: 1, dambaSettings: newDambaSettings },
       });
-      return false;
+      return { hasAlert: false, alertZoneIds: [] };
     }
-    const settingsAlerts = (JSON.parse(settings.alerts) as Alerts).alerts;
+    // Parse the alerts JSON string
+    const alertsData = JSON.parse(settings.alerts) as AlertsData;
+    const settingsAlerts = alertsData.alerts;
     const settingsFilteredAlertsLength = settingsAlerts.filter(
       (alert) => alert.alertZoneIds.length > 0,
     ).length;
@@ -251,11 +260,18 @@ export class DambaService {
       create: { id: 1, dambaSettings: newDambaSettings },
     });
 
-    return (
+    const hasAlert =
       dambaFilteredAlertsLength > 0 &&
       settingsFilteredAlertsLength > 0 &&
-      dambaFilteredAlertsLength !== settingsFilteredAlertsLength
-    );
+      dambaFilteredAlertsLength !== settingsFilteredAlertsLength;
+
+    const lastAlert = dambaFilteredAlerts[dambaFilteredAlerts.length - 1];
+
+    // Extract zone IDs from the last alert only
+    const alertZoneIds =
+      hasAlert && dambaFilteredAlerts.length > 0 ? lastAlert.alertZoneIds : [];
+
+    return { hasAlert, alertZoneIds };
   };
 
   async takeScreenshot(): Promise<string> {
