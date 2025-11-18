@@ -32,6 +32,7 @@ export class GroupSettingsService {
         enabled: dto.enabled,
         reactOnMessage: dto.reactOnMessage || null,
         shouldAlert: dto.shouldAlert ?? false,
+        zoneIds: dto.zoneIds || [],
       },
       create: {
         groupId: dto.groupId,
@@ -40,6 +41,7 @@ export class GroupSettingsService {
         enabled: dto.enabled,
         reactOnMessage: dto.reactOnMessage || null,
         shouldAlert: dto.shouldAlert ?? false,
+        zoneIds: dto.zoneIds || [],
       },
     });
 
@@ -71,6 +73,7 @@ export class GroupSettingsService {
         enabled: dto.enabled,
         reactOnMessage: dto.reactOnMessage || null,
         shouldAlert: dto.shouldAlert ?? false,
+        zoneIds: dto.zoneIds !== undefined ? dto.zoneIds : undefined,
       },
     });
 

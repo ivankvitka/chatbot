@@ -1,4 +1,11 @@
-import { IsString, IsInt, IsBoolean, IsIn, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsInt,
+  IsBoolean,
+  IsIn,
+  IsOptional,
+  IsArray,
+} from 'class-validator';
 
 export class UpdateGroupSettingsDto {
   @IsString()
@@ -21,4 +28,9 @@ export class UpdateGroupSettingsDto {
   @IsOptional()
   @IsBoolean()
   shouldAlert?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  zoneIds?: string[];
 }

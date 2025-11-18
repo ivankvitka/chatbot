@@ -55,7 +55,8 @@ class WhatsappApi {
     intervalMinutes: number,
     enabled: boolean,
     reactOnMessage?: string,
-    shouldAlert?: boolean
+    shouldAlert?: boolean,
+    zoneIds?: string[]
   ) {
     const response = await this.api.post("/whatsapp/groups/settings", {
       groupId,
@@ -64,6 +65,7 @@ class WhatsappApi {
       enabled,
       reactOnMessage,
       shouldAlert,
+      zoneIds,
     });
     return response.data;
   }
