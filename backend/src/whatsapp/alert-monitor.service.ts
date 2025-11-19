@@ -13,7 +13,7 @@ import * as path from 'path';
 export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AlertMonitorService.name);
   private interval: NodeJS.Timeout | null = null;
-  private readonly CHECK_INTERVAL = 5000; // Check every 60 seconds
+  private readonly CHECK_INTERVAL = 60000; // Check every 1 minute
 
   constructor(
     private readonly prisma: PrismaService,
@@ -100,10 +100,9 @@ export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
       // Send to groups with shouldAlert enabled and matching zoneIds
       for (const group of groups) {
         // If group has zoneIds configured, check if any of them match alertZoneIds
-        // If group has no zoneIds configured, send to all (backward compatibility)
         const groupZoneIds = group.zoneIds || [];
         const shouldSendToGroup =
-          groupZoneIds.length === 0 ||
+          groupZoneIds.length > 0 &&
           groupZoneIds.some((zoneId) =>
             alertResult.alertZoneIds.includes(zoneId),
           );

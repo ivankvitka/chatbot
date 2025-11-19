@@ -245,7 +245,7 @@ export const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
               {shouldAlert && (
                 <div className="mt-4 ml-6">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Зони для відстеження (залиште порожнім для всіх зон):
+                    Зони для відстеження:
                   </label>
                   {zones.length > 0 ? (
                     <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-md p-3">
