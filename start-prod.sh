@@ -45,8 +45,18 @@ check_port() {
 # Function to kill process on port
 kill_port() {
     local port=$1
-    local pid=$(lsof -ti :$port)
-    if [ -n "$pid" ]; then
+    local pid=""
+    
+    # Try to find PID using different methods
+    if command -v lsof &> /dev/null; then
+        pid=$(lsof -ti :$port 2>/dev/null)
+    elif command -v ss &> /dev/null; then
+        pid=$(ss -tlnp | grep ":$port " | grep -oP 'pid=\K[0-9]+' | head -1)
+    elif command -v netstat &> /dev/null; then
+        pid=$(netstat -tlnp 2>/dev/null | grep ":$port " | grep -oP '\d+/\w+' | cut -d'/' -f1 | head -1)
+    fi
+    
+    if [ -n "$pid" ] && [ "$pid" != "" ]; then
         print_warning "Killing process on port $port (PID: $pid)"
         kill -TERM "$pid" 2>/dev/null
         sleep 2
@@ -91,10 +101,19 @@ cleanup() {
     if [ -n "$DOCKER_COMPOSE_CMD" ]; then
         $DOCKER_COMPOSE_CMD down 2>/dev/null
     else
+        # Fallback: try to determine Docker command
+        if docker info > /dev/null 2>&1; then
+            DOCKER_CMD_FALLBACK="docker"
+        elif sudo docker info > /dev/null 2>&1; then
+            DOCKER_CMD_FALLBACK="sudo docker"
+        else
+            DOCKER_CMD_FALLBACK="docker"
+        fi
+        
         if command -v docker-compose &> /dev/null; then
-            docker-compose down 2>/dev/null
-        elif docker compose version &> /dev/null; then
-            docker compose down 2>/dev/null
+            $DOCKER_CMD_FALLBACK-compose down 2>/dev/null
+        elif $DOCKER_CMD_FALLBACK compose version &> /dev/null; then
+            $DOCKER_CMD_FALLBACK compose down 2>/dev/null
         fi
     fi
     
@@ -108,21 +127,81 @@ trap cleanup SIGINT SIGTERM EXIT
 # Check prerequisites
 print_step "Checking prerequisites..."
 
-# Check if Docker is running
-if ! docker info > /dev/null 2>&1; then
-    print_error "Docker is not running. Please start Docker and try again."
+# Function to check if Docker is accessible (with or without sudo)
+check_docker_access() {
+    if docker info > /dev/null 2>&1; then
+        DOCKER_CMD="docker"
+        return 0
+    elif sudo docker info > /dev/null 2>&1; then
+        DOCKER_CMD="sudo docker"
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Function to start Docker service (for Linux)
+start_docker_service() {
+    if command -v systemctl &> /dev/null; then
+        print_info "Attempting to start Docker service..."
+        if sudo systemctl start docker 2>/dev/null; then
+            print_info "Docker service started successfully"
+            sleep 2  # Wait for Docker to fully start
+            return 0
+        else
+            print_warning "Could not start Docker service. You may need to start it manually: sudo systemctl start docker"
+            return 1
+        fi
+    else
+        return 1
+    fi
+}
+
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+    print_error "Docker is not installed. Please install Docker first."
+    print_info "Installation instructions: https://docs.docker.com/engine/install/ubuntu/"
     exit 1
 fi
 
+# Check if Docker is accessible
+if ! check_docker_access; then
+    print_warning "Docker is not accessible. Attempting to start Docker service..."
+    if start_docker_service; then
+        # Retry checking Docker access
+        if ! check_docker_access; then
+            print_error "Docker is still not accessible after starting the service."
+            print_error "Please ensure Docker is running and you have proper permissions."
+            print_info "Try: sudo systemctl start docker"
+            print_info "Or add your user to docker group: sudo usermod -aG docker $USER (then logout/login)"
+            exit 1
+        fi
+    else
+        print_error "Docker is not running and could not be started automatically."
+        print_error "Please start Docker manually: sudo systemctl start docker"
+        exit 1
+    fi
+fi
+
+print_info "Docker is accessible (using: $DOCKER_CMD)"
+
 # Check for docker-compose or docker compose
+# Determine if we need sudo prefix
+DOCKER_SUDO=""
+if [[ "$DOCKER_CMD" == "sudo docker" ]]; then
+    DOCKER_SUDO="sudo "
+fi
+
 if command -v docker-compose &> /dev/null; then
-    DOCKER_COMPOSE_CMD="docker-compose"
-elif docker compose version &> /dev/null; then
-    DOCKER_COMPOSE_CMD="docker compose"
+    DOCKER_COMPOSE_CMD="${DOCKER_SUDO}docker-compose"
+elif $DOCKER_CMD compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="$DOCKER_CMD compose"
 else
     print_error "docker-compose or docker compose not found. Please install Docker Compose."
     exit 1
 fi
+
+print_info "Using Docker Compose command: $DOCKER_COMPOSE_CMD"
 
 # Check if Node.js is installed
 if ! command -v node &> /dev/null; then
@@ -158,6 +237,13 @@ fi
 print_step "Starting PostgreSQL database..."
 cd "$SCRIPT_DIR/backend" || exit
 $DOCKER_COMPOSE_CMD up -d postgres
+
+if [ $? -ne 0 ]; then
+    print_error "Failed to start PostgreSQL container"
+    print_error "Check Docker logs: $DOCKER_CMD logs postgres2"
+    cleanup
+    exit 1
+fi
 
 # Wait for PostgreSQL to be ready
 print_info "Waiting for PostgreSQL to be ready..."
