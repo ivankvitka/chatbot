@@ -36,39 +36,44 @@ An automated screenshot service that captures screenshots from Damba platform an
 
 ```
 chatbot/
-├── docker-compose.yml          # Docker services configuration
-├── docker-compose.override.yml # Development overrides
-├── docker.env                  # Docker environment variables
-├── Makefile                    # Development workflow automation
-├── .dockerignore              # Docker ignore file
 ├── backend/
+│   ├── docker-compose.yml     # Docker services configuration
 │   ├── prisma/
 │   │   └── schema.prisma      # Database schema
 │   ├── src/
 │   │   ├── damba/             # Damba integration module
-│   │   ├── whatsapp/           # WhatsApp integration module
-│   │   │   ├── dto/            # Data transfer objects
-│   │   │   ├── group-settings.service.ts  # Group settings management
+│   │   │   ├── dto/           # Data transfer objects
+│   │   │   ├── guards/        # Authentication guards
+│   │   │   ├── interfaces/   # TypeScript interfaces
+│   │   │   ├── damba.controller.ts    # Damba API endpoints
+│   │   │   ├── damba.service.ts        # Damba service
+│   │   │   └── zone.service.ts         # Zone management service
+│   │   ├── whatsapp/          # WhatsApp integration module
+│   │   │   ├── dto/           # Data transfer objects
+│   │   │   ├── alert-monitor.service.ts      # Message monitoring
+│   │   │   ├── group-settings.service.ts     # Group settings management
 │   │   │   ├── screenshot-scheduler.service.ts  # Scheduled screenshot sending
-│   │   │   ├── whatsapp.service.ts        # WhatsApp client service
-│   │   │   └── whatsapp.controller.ts     # WhatsApp API endpoints
+│   │   │   ├── whatsapp.service.ts            # WhatsApp client service
+│   │   │   └── whatsapp.controller.ts         # WhatsApp API endpoints
 │   │   ├── prisma/            # Database service
-│   │   ├── common/            # Shared utilities and DTOs
 │   │   └── app.module.ts      # Main application module
 │   └── package.json
 └── frontend/
     ├── src/
     │   ├── components/        # React components
-    │   │   ├── DambaAuthModal.tsx      # Damba authentication
-    │   │   ├── GroupSettingsModal.tsx  # Group settings configuration
-    │   │   ├── Header.tsx              # Application header
-    │   │   ├── ScreenshotModal.tsx     # Screenshot viewer
-    │   │   ├── WhatsAppAuthModal.tsx   # WhatsApp QR authentication
-    │   │   └── WhatsAppGroupsList.tsx  # Groups list with settings
+    │   │   ├── AuthStatusButton.tsx      # Authentication status button
+    │   │   ├── DambaAuthModal.tsx        # Damba authentication
+    │   │   ├── GroupSettingsModal.tsx    # Group settings configuration
+    │   │   ├── Header.tsx                # Application header
+    │   │   ├── ScreenshotModal.tsx       # Screenshot viewer
+    │   │   ├── WhatsAppAuthModal.tsx     # WhatsApp QR authentication
+    │   │   ├── WhatsAppGroupsList.tsx    # Groups list with settings
+    │   │   └── ZonesManagementModal.tsx  # Zones management
     │   ├── services/          # API services
+    │   │   ├── base.api.ts    # Base API configuration
     │   │   ├── damba.api.ts   # Damba API client
     │   │   └── whatsapp.api.ts # WhatsApp API client
-    │   ├── stores/             # Zustand state management
+    │   ├── stores/            # Zustand state management
     │   │   ├── damba.store.ts  # Damba state
     │   │   └── whatsapp.store.ts # WhatsApp state
     │   └── pages/
@@ -89,48 +94,63 @@ chatbot/
 
 ### Docker Setup (Recommended)
 
-1. **Start the database services:**
+1. **Navigate to the backend directory:**
 
    ```bash
-   docker-compose up -d postgres pgadmin
+   cd backend
    ```
 
-   This will start:
+2. **Start the database service:**
 
-   - PostgreSQL database on port 5432
-   - pgAdmin web interface on port 8080
+   ```bash
+   docker-compose up -d postgres
+   ```
 
-2. **Verify the database is running:**
+   This will start PostgreSQL database on port 5432.
+
+3. **Verify the database is running:**
 
    ```bash
    docker-compose ps
    ```
 
-3. **Access pgAdmin (optional):**
+### Install Dependencies
 
-   Open http://localhost:8080 and login with:
+**Quick Setup (Recommended):**
 
-   - Email: `admin@chatbot.com`
-   - Password: `admin123`
-
-### Quick Setup with Makefile (Recommended)
-
-For easier development workflow, use the provided Makefile:
+Use the provided installation script to install all dependencies at once:
 
 ```bash
-# Complete setup (Docker + dependencies)
-make setup
+# Make script executable (first time only)
+chmod +x install.sh
 
-# Start development servers
-make dev
-
-# Other useful commands
-make help          # Show all available commands
-make db-up         # Start database only
-make db-down       # Stop database
-make db-logs       # View database logs
-make reset         # Reset everything (WARNING: deletes data)
+# Install all dependencies (backend + frontend)
+./install.sh
 ```
+
+This script will:
+
+- Install backend dependencies
+- Generate Prisma client
+- Install frontend dependencies
+
+**Manual Setup:**
+
+Alternatively, you can install dependencies manually:
+
+1. **Backend dependencies:**
+
+   ```bash
+   cd backend
+   npm install
+   ```
+
+2. **Frontend dependencies:**
+
+   ```bash
+   cd frontend
+   npm install
+   ```
 
 ### Backend Setup
 
@@ -140,13 +160,7 @@ make reset         # Reset everything (WARNING: deletes data)
    cd backend
    ```
 
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. Set up the database:
+2. Set up the database:
 
    **If using Docker** (recommended): The database is already running from the previous step.
 
@@ -163,19 +177,15 @@ make reset         # Reset everything (WARNING: deletes data)
    npm run db:migrate
    ```
 
-4. Create environment file:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-   Update the `.env` file with your configuration, including:
+3. Create environment file (`.env`) with your configuration:
 
    ```env
    DATABASE_URL="postgresql://username:password@localhost:5432/chatbot_db?schema=public"
+   POSTGRES_USER=postgres
+   POSTGRES_PASSWORD=your_password
    ```
 
-5. Start the development server:
+4. Start the development server:
    ```bash
    npm run start:dev
    ```
@@ -190,13 +200,7 @@ The backend will be running on `http://localhost:3000`.
    cd frontend
    ```
 
-2. Install dependencies:
-
-   ```bash
-   npm install
-   ```
-
-3. Start the development server:
+2. Start the development server:
    ```bash
    npm run dev
    ```
@@ -244,14 +248,18 @@ The frontend will be running on `http://localhost:5173`.
 
 - `GET /damba/screenshot` - Get latest screenshot from Damba platform
 - `POST /damba/token` - Save Damba authentication token
+- `GET /damba/zones` - Get all zones
+- `POST /damba/zones` - Create a new zone
+- `PUT /damba/zones/:id` - Update a zone
+- `DELETE /damba/zones/:id` - Delete a zone
 
 ### WhatsApp
 
 - `GET /whatsapp/status` - Check WhatsApp connection status
 - `GET /whatsapp/qr` - Get QR code for authentication
+- `POST /whatsapp/logout` - Logout from WhatsApp
 - `GET /whatsapp/groups` - Get user's WhatsApp groups with settings
-- `POST /whatsapp/send-screenshot` - Manually send screenshot to group
-- `POST /whatsapp/send-message` - Send text message to chat
+- `POST /whatsapp/send-message` - Send message with screenshot to groups
 - `GET /whatsapp/groups/:groupId/settings` - Get group settings
 - `POST /whatsapp/groups/settings` - Create or update group settings
 - `PUT /whatsapp/groups/:groupId/settings` - Update group settings
@@ -274,17 +282,19 @@ npm run test
 ### Docker Management
 
 ```bash
-# Start database services
-docker-compose up -d
+# Navigate to backend directory
+cd backend
 
-# Stop database services
+# Start database service
+docker-compose up -d postgres
+
+# Stop database service
 docker-compose down
 
 # View service logs
 docker-compose logs postgres
-docker-compose logs pgadmin
 
-# Restart services
+# Restart service
 docker-compose restart
 
 # Remove volumes (WARNING: This will delete all data)
