@@ -320,6 +320,43 @@ cd frontend
 npm run build
 ```
 
+### Running in Production Mode (Local)
+
+For testing production builds locally, use the `start-prod.sh` script:
+
+```bash
+# Make script executable (first time only)
+chmod +x start-prod.sh
+
+# Run all services in production mode
+./start-prod.sh
+```
+
+This script will:
+
+- ✅ Start PostgreSQL database via Docker
+- ✅ Build backend for production
+- ✅ Build frontend for production
+- ✅ Start backend in production mode (port 3000)
+- ✅ Start frontend preview server (port 4173)
+- ✅ Automatically cleanup all services on Ctrl+C
+
+**Features:**
+
+- Automatic port checking and cleanup
+- Graceful shutdown of all services
+- Health checks for all services
+- Colored output for better readability
+- Logs saved to `/tmp/backend-prod.log` and `/tmp/frontend-prod.log`
+
+**To stop all services:**
+
+- Press `Ctrl+C` - all services will be gracefully shut down
+- The script automatically:
+  - Stops all Node.js processes
+  - Stops Docker containers
+  - Cleans up ports
+
 ## Security Notes
 
 - Use HTTPS in production
