@@ -8,18 +8,25 @@ import { PrismaService } from '../prisma/prisma.service';
 import { WhatsappService } from './whatsapp.service';
 import { DambaService } from '../damba/damba.service';
 import * as path from 'path';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class AlertMonitorService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(AlertMonitorService.name);
   private interval: NodeJS.Timeout | null = null;
-  private readonly CHECK_INTERVAL = 60000; // Check every 1 minute
+  private readonly CHECK_INTERVAL: number;
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly whatsappService: WhatsappService,
     private readonly dambaService: DambaService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.CHECK_INTERVAL = this.configService.get<number>(
+      'CHECK_INTERVAL',
+      5000,
+    );
+  }
 
   onModuleInit() {
     // Start periodic check
