@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { DambaService } from './damba.service';
 import { SaveDambaTokenDto } from './dto/save-damba-token.dto';
+import { SaveMapCenterDto } from './dto/save-map-center.dto';
 import { DambaAuthGuard } from './guards/damba-auth.guard';
 import { ZoneService } from './zone.service';
 import { CreateZoneDto, UpdateZoneDto } from './dto/create-zone.dto';
@@ -67,5 +68,21 @@ export class DambaController {
   async deleteZone(@Param('id', ParseIntPipe) id: number) {
     await this.zoneService.deleteZone(id);
     return { success: true };
+  }
+
+  // Map center settings endpoints
+  @Get('map-center')
+  async getMapCenter() {
+    const mapCenter = await this.dambaService.getMapCenter();
+    return { mapCenter };
+  }
+
+  @Post('map-center')
+  async saveMapCenter(@Body() saveMapCenterDto: SaveMapCenterDto) {
+    await this.dambaService.saveMapCenter(saveMapCenterDto.coordinates);
+    return {
+      success: true,
+      message: 'Map center coordinates saved and browser restarted',
+    };
   }
 }

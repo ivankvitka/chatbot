@@ -18,6 +18,7 @@ model AppConfig {
   id            Int      @id @default(1) // Singleton pattern - always id = 1
   dambaToken    String?  @map("damba_token")
   dambaSettings String?  @map("damba_settings")
+  mapCenterCoord String? @map("map_center_coord") // JSON array: [latitude, longitude]
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
