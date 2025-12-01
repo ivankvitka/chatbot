@@ -140,13 +140,23 @@ export class DambaService {
       }
     }
 
+    // Get saved map center coordinates from database
+    const config = await this.prisma.appConfig.findUnique({
+      where: { id: 1 },
+    });
+    const savedCoord = (config as { mapCenterCoord?: string | null })
+      ?.mapCenterCoord;
+    const mapCenterCoord: string =
+      (savedCoord && typeof savedCoord === 'string' && savedCoord) ||
+      '[50.91410065304415,34.39479231834412]';
+
     await this.page.setViewportSize({
       width: 1920,
       height: 1080,
     });
     await this.page.goto('https://damba.live/');
     await this.page.evaluate(
-      ({ refreshToken, tokenExpires }) => {
+      ({ refreshToken, tokenExpires, mapCenter }) => {
         const sessionData = {
           ['refresh-token']: refreshToken,
           ['refresh-token-expires']: tokenExpires,
@@ -170,13 +180,14 @@ export class DambaService {
         );
         window.localStorage.setItem(
           '515cd4e4-6755-428b-bc8a-14c89aedb50d-map-center-coord',
-          '[50.91410065304415,34.39479231834412]',
+          mapCenter,
         );
         document.location.pathname = '/map';
       },
       {
         refreshToken: token || '',
         tokenExpires: expiresAt?.toString() || '',
+        mapCenter: mapCenterCoord,
       },
     );
     // Wait for navigation to /map page to complete
@@ -409,6 +420,46 @@ export class DambaService {
         `Error saving Damba token: ${error instanceof Error ? error.message : String(error)}`,
       );
       throw error;
+    }
+  }
+
+  async saveMapCenter(coordinates: [number, number]): Promise<void> {
+    try {
+      const mapCenterCoord = JSON.stringify(coordinates);
+      await this.prisma.appConfig.upsert({
+        where: { id: 1 },
+        update: { mapCenterCoord },
+        create: { id: 1, mapCenterCoord },
+      });
+      // Restart browser when map center is changed
+      await this.closeBrowser();
+      await this.launchBrowser();
+      await this.authenticate();
+      this.logger.log('Map center coordinates saved and browser restarted');
+    } catch (error) {
+      this.logger.error(
+        `Error saving map center: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      throw error;
+    }
+  }
+
+  async getMapCenter(): Promise<[number, number] | null> {
+    try {
+      const config = await this.prisma.appConfig.findUnique({
+        where: { id: 1 },
+      });
+      const mapCenterCoord = (config as { mapCenterCoord?: string | null })
+        ?.mapCenterCoord;
+      if (!mapCenterCoord || typeof mapCenterCoord !== 'string') {
+        return null;
+      }
+      return JSON.parse(mapCenterCoord) as [number, number];
+    } catch (error) {
+      this.logger.error(
+        `Error getting map center: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return null;
     }
   }
 }

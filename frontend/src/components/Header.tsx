@@ -4,12 +4,14 @@ import { useDambaStore } from "../stores/damba.store";
 import { WhatsAppAuthModal } from "./WhatsAppAuthModal";
 import { DambaAuthModal } from "./DambaAuthModal";
 import { ZonesManagementModal } from "./ZonesManagementModal";
+import { MapCenterSettingsModal } from "./MapCenterSettingsModal";
 import { AuthStatusButton } from "./AuthStatusButton";
 
 export const Header: React.FC = () => {
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [showDambaModal, setShowDambaModal] = useState(false);
   const [showZonesModal, setShowZonesModal] = useState(false);
+  const [showMapCenterModal, setShowMapCenterModal] = useState(false);
   const { status, checkStatus } = useWhatsAppStore();
   const { isAuthenticated, checkStatus: checkDambaStatus } = useDambaStore();
 
@@ -37,6 +39,32 @@ export const Header: React.FC = () => {
               </h1>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowMapCenterModal(true)}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
+                title="Налаштування центру карти"
+              >
+                <svg
+                  className="w-5 h-5 mr-2"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
+                  />
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+                Центр карти
+              </button>
               <button
                 onClick={() => setShowZonesModal(true)}
                 className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition-colors duration-200"
@@ -114,6 +142,11 @@ export const Header: React.FC = () => {
       <ZonesManagementModal
         isOpen={showZonesModal}
         onClose={() => setShowZonesModal(false)}
+      />
+
+      <MapCenterSettingsModal
+        isOpen={showMapCenterModal}
+        onClose={() => setShowMapCenterModal(false)}
       />
     </>
   );

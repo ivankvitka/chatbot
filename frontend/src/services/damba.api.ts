@@ -46,6 +46,17 @@ class DambaApi {
     const response = await this.api.delete(`/damba/zones/${id}`);
     return response.data;
   }
+
+  // Map center management methods
+  async getMapCenter() {
+    const response = await this.api.get("/damba/map-center");
+    return response.data.mapCenter as [number, number] | null;
+  }
+
+  async saveMapCenter(coordinates: [number, number]) {
+    const response = await this.api.post("/damba/map-center", { coordinates });
+    return response.data;
+  }
 }
 
 export const dambaApi = new DambaApi();
