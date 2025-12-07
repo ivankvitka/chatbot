@@ -25,6 +25,12 @@ export const Dashboard: React.FC = () => {
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = useState(false);
+  const [lastAlertId, setLastAlertId] = useState<string | null>(null);
+  const [showRedShadow, setShowRedShadow] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(() => {
+    const saved = localStorage.getItem("soundNotificationEnabled");
+    return saved !== null ? saved === "true" : true; // Default to enabled
+  });
   const { getGroups } = useWhatsAppStore();
   const { checkStatus } = useDambaStore();
 
@@ -96,6 +102,83 @@ export const Dashboard: React.FC = () => {
     };
   }, [getGroups, checkStatus, loadScreenshot]);
 
+  // Check for alerts and play sound notification
+  useEffect(() => {
+    const playNotificationSound = () => {
+      try {
+        // Create audio context for generating a beep sound
+        const audioContext = new (window.AudioContext ||
+          (window as unknown as { webkitAudioContext: AudioContext })
+            .webkitAudioContext)();
+
+        // Play sound three times with pauses between
+        for (let i = 0; i < 3; i++) {
+          const startTime = audioContext.currentTime + i * 0.6; // 0.5s sound + 0.1s pause
+          const oscillator = audioContext.createOscillator();
+          const gainNode = audioContext.createGain();
+
+          oscillator.connect(gainNode);
+          gainNode.connect(audioContext.destination);
+
+          oscillator.frequency.value = 800; // Frequency in Hz
+          oscillator.type = "sine";
+
+          gainNode.gain.setValueAtTime(0.3, startTime);
+          gainNode.gain.exponentialRampToValueAtTime(0.01, startTime + 0.5);
+
+          oscillator.start(startTime);
+          oscillator.stop(startTime + 0.5);
+        }
+      } catch (error) {
+        console.error("Error playing sound notification:", error);
+      }
+    };
+
+    const checkAlertStatus = async () => {
+      try {
+        const currentStatus = useDambaStore.getState().isAuthenticated;
+        if (!currentStatus) {
+          return;
+        }
+
+        const alertStatus = await dambaApi.getAlertStatus();
+
+        if (
+          alertStatus.hasAlert &&
+          alertStatus.lastDambaAlert &&
+          alertStatus.lastDambaAlert.alertType &&
+          alertStatus.lastDambaAlert.alertType.toLowerCase().includes("entered")
+        ) {
+          // Check if this is a new alert (different ID)
+          if (alertStatus.lastDambaAlert.id !== lastAlertId) {
+            setLastAlertId(alertStatus.lastDambaAlert.id);
+            if (soundEnabled) {
+              playNotificationSound();
+            }
+            // Show red shadow for 3 seconds
+            setShowRedShadow(true);
+            setTimeout(() => {
+              setShowRedShadow(false);
+            }, 3000);
+          }
+        }
+      } catch (error) {
+        // Silently handle errors (e.g., 401 unauthorized)
+        console.error("Error checking alert status:", error);
+      }
+    };
+
+    // Check immediately
+    checkAlertStatus();
+
+    // Set up periodic check every 5 seconds
+    const alertIntervalId = setInterval(checkAlertStatus, 5000);
+
+    return () => {
+      clearInterval(alertIntervalId);
+    };
+  }, [lastAlertId, soundEnabled]);
+
   const handleSend = useCallback(async () => {
     if (selectedGroupIds.length === 0) {
       setSendError("Будь ласка, оберіть хоча б одну групу");
@@ -161,6 +244,36 @@ export const Dashboard: React.FC = () => {
                   Останній скріншот
                 </h3>
                 <div className="flex items-center gap-3">
+                  {/* Sound notification toggle */}
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <span className="text-sm text-gray-600">Звук</span>
+                    <div className="relative">
+                      <input
+                        type="checkbox"
+                        checked={soundEnabled}
+                        onChange={(e) => {
+                          const enabled = e.target.checked;
+                          setSoundEnabled(enabled);
+                          localStorage.setItem(
+                            "soundNotificationEnabled",
+                            enabled.toString()
+                          );
+                        }}
+                        className="sr-only"
+                      />
+                      <div
+                        className={`w-11 h-6 rounded-full transition-colors ${
+                          soundEnabled ? "bg-blue-600" : "bg-gray-300"
+                        }`}
+                      >
+                        <div
+                          className={`w-5 h-5 translate-y-0.5 bg-white rounded-full shadow-md transform transition-transform ${
+                            soundEnabled ? "translate-x-5" : "translate-x-0.5"
+                          } mt-0.5`}
+                        />
+                      </div>
+                    </div>
+                  </label>
                   {screenshot && (
                     <span className="text-sm text-gray-500">
                       {new Date(screenshot.createdAt).toLocaleString("uk-UA", {
@@ -232,7 +345,13 @@ export const Dashboard: React.FC = () => {
               )}
 
               {!loading && !error && screenshot && (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div
+                  className={`border border-gray-200 rounded-lg overflow-hidden transition-all duration-300 ${
+                    showRedShadow
+                      ? "shadow-[0_0_20px_5px_rgba(239,68,68,0.8)]"
+                      : ""
+                  }`}
+                >
                   <img
                     src={screenshot.url}
                     alt="Останній скріншот"

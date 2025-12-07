@@ -6,10 +6,11 @@ import * as path from 'path';
 import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
-  Alerts,
+  Alert,
   AlertsData,
   DambaSettings,
 } from './interfaces/DambaSettings.interface';
+import { getLastElement } from 'src/common/utils';
 
 @Injectable()
 export class DambaService {
@@ -221,6 +222,7 @@ export class DambaService {
   shouldAlert = async (): Promise<{
     hasAlert: boolean;
     alertZoneIds: string[];
+    lastDambaAlert: Alert | null;
   }> => {
     if (!this.page) {
       throw new Error('Page not initialized');
@@ -229,24 +231,23 @@ export class DambaService {
       where: { id: 1 },
       select: { dambaSettings: true },
     });
-    const { dambaFilteredAlertsLength, newDambaSettings, dambaFilteredAlerts } =
-      await this.page.evaluate(() => {
+    const { newDambaSettings, dambaFilteredAlerts } = await this.page.evaluate(
+      () => {
         const pageAlerts = window.localStorage.getItem('alerts') as string;
-        const dambaAlerts = (JSON.parse(pageAlerts) as Alerts).alerts;
+        const dambaAlerts = (JSON.parse(pageAlerts) as AlertsData).eventLog;
+        const dambaFilteredAlerts = dambaAlerts.filter(
+          (alert) => alert.alertZoneIds.length > 0,
+        );
 
         return {
-          dambaFilteredAlertsLength: dambaAlerts.filter(
-            (alert) => alert.alertZoneIds.length > 0,
-          ).length,
           newDambaSettings: JSON.stringify(window.localStorage),
-          dambaFilteredAlerts: dambaAlerts.filter(
-            (alert) => alert.alertZoneIds.length > 0,
-          ),
+          dambaFilteredAlerts,
         };
-      });
+      },
+    );
 
     if (!result?.dambaSettings) {
-      return { hasAlert: false, alertZoneIds: [] };
+      return { hasAlert: false, alertZoneIds: [], lastDambaAlert: null };
     }
     const settings = JSON.parse(result.dambaSettings) as DambaSettings;
 
@@ -256,14 +257,16 @@ export class DambaService {
         update: { dambaSettings: newDambaSettings },
         create: { id: 1, dambaSettings: newDambaSettings },
       });
-      return { hasAlert: false, alertZoneIds: [] };
+      return { hasAlert: false, alertZoneIds: [], lastDambaAlert: null };
     }
     // Parse the alerts JSON string
     const alertsData = JSON.parse(settings.alerts) as AlertsData;
-    const settingsAlerts = alertsData.alerts;
-    const settingsFilteredAlertsLength = settingsAlerts.filter(
+    const settingsAlerts = alertsData.eventLog;
+    const settingsFiltered = settingsAlerts.filter(
       (alert) => alert.alertZoneIds.length > 0,
-    ).length;
+    );
+    const lastSettingsAlert = getLastElement(settingsFiltered);
+    const lastDambaAlert = getLastElement(dambaFilteredAlerts);
 
     await this.prisma.appConfig.upsert({
       where: { id: 1 },
@@ -272,17 +275,14 @@ export class DambaService {
     });
 
     const hasAlert =
-      dambaFilteredAlertsLength > 0 &&
-      settingsFilteredAlertsLength > 0 &&
-      dambaFilteredAlertsLength !== settingsFilteredAlertsLength;
-
-    const lastAlert = dambaFilteredAlerts[dambaFilteredAlerts.length - 1];
+      !!lastDambaAlert &&
+      !!lastSettingsAlert &&
+      lastDambaAlert.id !== lastSettingsAlert.id;
 
     // Extract zone IDs from the last alert only
-    const alertZoneIds =
-      hasAlert && dambaFilteredAlerts.length > 0 ? lastAlert.alertZoneIds : [];
+    const alertZoneIds = hasAlert ? lastDambaAlert.alertZoneIds : [];
 
-    return { hasAlert, alertZoneIds };
+    return { hasAlert, alertZoneIds, lastDambaAlert: lastDambaAlert || null };
   };
 
   async takeScreenshot(): Promise<string> {
