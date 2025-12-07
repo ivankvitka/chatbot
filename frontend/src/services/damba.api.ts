@@ -57,6 +57,11 @@ class DambaApi {
     const response = await this.api.post("/damba/map-center", { coordinates });
     return response.data;
   }
+
+  async getAlertStatus() {
+    const response = await this.api.get("/damba/alert-status");
+    return response.data;
+  }
 }
 
 export const dambaApi = new DambaApi();

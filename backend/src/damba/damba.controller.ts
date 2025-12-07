@@ -85,4 +85,14 @@ export class DambaController {
       message: 'Map center coordinates saved and browser restarted',
     };
   }
+
+  @Get('alert-status')
+  @UseGuards(DambaAuthGuard)
+  async getAlertStatus() {
+    const alertResult = await this.dambaService.shouldAlert();
+    return {
+      hasAlert: alertResult.hasAlert,
+      lastDambaAlert: alertResult.lastDambaAlert,
+    };
+  }
 }
