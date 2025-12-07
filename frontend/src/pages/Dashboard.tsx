@@ -31,6 +31,7 @@ export const Dashboard: React.FC = () => {
     const saved = localStorage.getItem("soundNotificationEnabled");
     return saved !== null ? saved === "true" : true; // Default to enabled
   });
+  const [addedZones, setAddedZones] = useState<string[]>([]);
   const { getGroups } = useWhatsAppStore();
   const { checkStatus } = useDambaStore();
 
@@ -85,6 +86,17 @@ export const Dashboard: React.FC = () => {
     loadScreenshot();
     getGroups();
 
+    // Load added zones
+    const loadZones = async () => {
+      try {
+        const zones = await dambaApi.getAllZones();
+        setAddedZones(zones.map((zone) => zone.zoneId));
+      } catch (error) {
+        console.error("Error loading zones:", error);
+      }
+    };
+    loadZones();
+
     // Set up automatic refresh every 10 seconds
     // Only refresh if user is authenticated to Damba
     const intervalId = setInterval(async () => {
@@ -93,6 +105,13 @@ export const Dashboard: React.FC = () => {
       const currentStatus = useDambaStore.getState().isAuthenticated;
       if (currentStatus) {
         loadScreenshot(true);
+        // Reload zones periodically
+        try {
+          const zones = await dambaApi.getAllZones();
+          setAddedZones(zones.map((zone) => zone.zoneId));
+        } catch (error) {
+          console.error("Error reloading zones:", error);
+        }
       }
     }, 20000); // 20000 milliseconds = 20 seconds
 
@@ -149,17 +168,26 @@ export const Dashboard: React.FC = () => {
           alertStatus.lastDambaAlert.alertType &&
           alertStatus.lastDambaAlert.alertType.toLowerCase().includes("entered")
         ) {
-          // Check if this is a new alert (different ID)
-          if (alertStatus.lastDambaAlert.id !== lastAlertId) {
-            setLastAlertId(alertStatus.lastDambaAlert.id);
-            if (soundEnabled) {
-              playNotificationSound();
+          // Check if alert is on added zones
+          const alertZoneIds = alertStatus.lastDambaAlert.alertZoneIds || [];
+          const isOnAddedZone = alertZoneIds.some((zoneId: string) =>
+            addedZones.includes(zoneId)
+          );
+
+          // Only trigger notification if alert is on added zones
+          if (isOnAddedZone) {
+            // Check if this is a new alert (different ID)
+            if (alertStatus.lastDambaAlert.id !== lastAlertId) {
+              setLastAlertId(alertStatus.lastDambaAlert.id);
+              if (soundEnabled) {
+                playNotificationSound();
+              }
+              // Show red shadow for 3 seconds
+              setShowRedShadow(true);
+              setTimeout(() => {
+                setShowRedShadow(false);
+              }, 3000);
             }
-            // Show red shadow for 3 seconds
-            setShowRedShadow(true);
-            setTimeout(() => {
-              setShowRedShadow(false);
-            }, 3000);
           }
         }
       } catch (error) {
@@ -177,7 +205,7 @@ export const Dashboard: React.FC = () => {
     return () => {
       clearInterval(alertIntervalId);
     };
-  }, [lastAlertId, soundEnabled]);
+  }, [lastAlertId, soundEnabled, addedZones]);
 
   const handleSend = useCallback(async () => {
     if (selectedGroupIds.length === 0) {
