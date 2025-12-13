@@ -1,6 +1,6 @@
 services:
   postgres:
-    container_name: postgres2
+    container_name: damba-postgres
     image: postgres:16
     restart: always
     environment:
@@ -11,10 +11,10 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
-      - nestjs-tutorial-network
+      - damba-network
 
 volumes:
   postgres_data:
 
 networks:
-  nestjs-tutorial-network:
+  damba-network:
